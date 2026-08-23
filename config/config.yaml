@@ -1,0 +1,88 @@
+# spotify-pipeline configuration
+# Credentials go in .env, never here.
+
+download:
+  output_dir: ~/Desktop/Spotify
+  intermediate_format: mp3
+  bitrate: "320k"
+  chunk_size: 100         # tracks per spotdl/yt-dlp job
+
+obsidian:
+  vault_path: ~/Documents/Spotify-Rip/Spotify-rip
+  subdir: spotify
+
+playlists:
+  owned_only: true        # skip playlists the user follows but doesn't own
+
+# ── VPN (Mullvad) ─────────────────────────────────────────────────────────────
+vpn:
+  enabled: true
+  country: sweden         # relay location passed to 'mullvad relay set location'
+  connect_timeout_s: 30   # seconds to wait for Mullvad to report Connected
+  allow_lan: true         # run 'mullvad lan set allow' after connecting
+
+  # DNS warmup gate — poll this host until it resolves before starting workers.
+  # Prevents socket.gaierror during the 2-5s DNS blackout on relay switching.
+  dns_warmup_host: "open.spotify.com"
+  dns_warmup_timeout_s: 60
+  dns_warmup_interval_s: 1
+
+  socks5:
+    host: "127.0.0.1"
+    port: 1080            # Mullvad's local SOCKS5 proxy port
+
+  # ── Defensive VPN (VPNManager) ──────────────────────────────────────────────
+  # relay_pool: EU relay pool for rotation. Countries: se (primary), nl, de.
+  # To override with a custom list set relay_pool.relays to an explicit list.
+  relay_pool:
+    countries: [se, nl, de]   # EU pool; SE = primary (best YouTube Music coverage)
+    history_size: 2           # exclude last N relays from next pick
+    auto_refresh: false       # set true to repopulate from `mullvad relay list` at startup
+
+  # egress verification — multi-endpoint consensus (requires 2/3 agreement)
+  egress:
+    timeout_s: 12
+    endpoints:
+      - "https://am.i.mullvad.net/json"   # Mullvad's own — confirms mullvad_exit_ip
+      - "https://icanhazip.com"           # neutral bare-IP
+      - "https://api.ipify.org?format=json"  # neutral JSON
+
+  # obfuscation — applied automatically on connect based on mullvad version
+  # (2023+): obfuscation auto (Shadowsocks / WireGuard-over-TCP)
+  # (2024+): + DAITA (dummy traffic + timing jitter)
+  auto_obfuscate: true
+
+  # background health monitor (runs inside MCP server process)
+  health_interval_s: 30     # seconds between egress re-checks while connected
+
+# ── Download sources ──────────────────────────────────────────────────────────
+sources:
+  # Priority order — first hit wins per track
+  priority:
+    - youtube_music
+    - youtube
+    - soundcloud
+    - internet_archive
+
+  youtube_music:
+    enabled: true
+    use_proxy: true       # route through Mullvad SOCKS5
+
+  youtube:
+    enabled: true
+    use_proxy: true
+
+  soundcloud:
+    enabled: true
+    use_proxy: false      # SoundCloud blocks SOCKS5 in some regions
+
+  internet_archive:
+    enabled: true
+    use_proxy: false
+
+# ── Worker pool ───────────────────────────────────────────────────────────────
+workers:
+  n_threads: 4            # parallel download threads
+  retry_passes: 3         # spotdl/yt-dlp retry passes per job
+  pass_delays_s: [20, 90] # wait between pass 1→2 and pass 2→3
+  pass_timeout_s: 600     # SIGKILL timeout per pass

@@ -1,0 +1,219 @@
+{
+  "main": {
+    "id": "875e5c21750d4dbf",
+    "type": "split",
+    "children": [
+      {
+        "id": "67d2d88263832b6e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "8270fe1b544353de",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "225e2d9c408e61d0",
+    "type": "split",
+    "children": [
+      {
+        "id": "31fecd805a2efd56",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "60255ab00cfdb0b8",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "f45f89c6ea5cb60c",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "ff0330050a43bf8e",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "060be7f43bcb5a34",
+    "type": "split",
+    "children": [
+      {
+        "id": "05fb52fcf2943baa",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "8e007e5b9c9a88d6",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "54458d12eb06352b",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "6d5faa29953485c4",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "bd5bedc8b74f6c13",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          },
+          {
+            "id": "5c1bf189a806e834",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 200
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "8270fe1b544353de",
+  "lastOpenFiles": [
+    "pipeline/vpn/__pycache__/mullvad.cpython-311 2.pyc",
+    "tests/__pycache__/test_cairrn_scheduler.cpython-311-pytest-9.1.1 2.pyc",
+    "graph/__pycache__/projector.cpython-311 2.pyc",
+    "tests/__pycache__/test_psspps_pipeline.cpython-311-pytest-9.1.1 2.pyc",
+    "graph/__pycache__/__init__.cpython-311 2.pyc",
+    "graph/__pycache__/store.cpython-311 2.pyc",
+    "tests/__pycache__/test_rate_ten.cpython-311-pytest-9.1.1 2.pyc",
+    "tests/__pycache__/test_phi_clip_tool.cpython-311-pytest-9.1.1 2.pyc",
+    "tests/__pycache__/test_tag_embedder.cpython-311-pytest-9.1.1 2.pyc",
+    "tests/__pycache__/test_completion_predictor.cpython-311-pytest-9.1.1 2.pyc",
+    "tests/__pycache__/test_cairrn_mycelial.cpython-311-pytest-9.1.1 2.pyc",
+    "sessions/live-context.md",
+    "music/GENRE.md",
+    "source.md",
+    "source/workers-init.md",
+    "sessions/test-projector-smoke.md",
+    "sessions/2026-08-21-072652-wire-connect-phi-core-ranker-package-after.md",
+    "sessions/2026-08-21-072133-modularise-the-package-extract-phi-core-ra.md",
+    "sessions/2026-08-21-063445-clean-fix-file-tree-after-cc-tp-rar-wiring.md",
+    "sessions/2026-08-21-063043-wire-connect-adaptive-capacity-and-cc-into.md",
+    "sessions/2026-08-21-062157-dev-wire-adaptive-capacity-and-cc-as-a-nex.md",
+    "sessions/2026-08-20-211254-the-adaptive-consumption-formula-and-the-cc-f.md",
+    "sessions/2026-08-20-101510-ingest-all-relevant-things-into-the-phi-obsid.md",
+    "source/index.md",
+    "source/phi-index.md",
+    "source/phi-watch-watcher.md",
+    "source/phi-watch-notify.md",
+    "source/phi-watch-librosa-worker.md",
+    "source/phi-watch-lastfm.md",
+    "source/phi-watch-enrich-daemon.md",
+    "source/phi-watch-init.md",
+    "source/phi-utils-walk.md",
+    "source/phi-utils-scheduler.md",
+    "source/phi-utils-replay.md",
+    "source/phi-utils-perpetual.md",
+    "source/phi-utils-log.md"
+  ]
+}

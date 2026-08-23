@@ -1,0 +1,24 @@
+{
+  "userIgnoreFilters": [
+    ".git",
+    ".hub.git",
+    ".pytest_cache",
+    "__pycache__",
+    "node_modules",
+    "*.pyc",
+    "*.egg-info",
+    "*.mp4",
+    "*.mp3",
+    "phi.app",
+    "models/cluster_out",
+    "*.coverage",
+    ".env",
+    "cursor-ingest",
+    ".cursor"
+  ],
+  "attachmentFolderPath": "assets",
+  "promptDelete": true,
+  "alwaysUpdateLinks": true,
+  "useMarkdownLinks": false,
+  "newFileLocation": "root"
+}

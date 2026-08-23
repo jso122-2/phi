@@ -1,0 +1,169 @@
+# Britantica encolpedia guide
+
+#keep #imported
+
+> created_ts: 2025-07-10-045210  
+> Created: 2025-07-10 04:52 UTC  
+> Edited: 2025-07-10 04:52 UTC  
+> Source: Google Keep  
+
+---
+
+Britannica 1956 Treasure Map
+
+A Directory of High-Impact Concepts for DAWN and Recursive Cognitive Architecture
+
+This directory tree maps important entries from the 1956 Encyclopedia Britannica worth scanning or flipping to. Page numbers and volumes are approximate based on 1956 printings (Volumes 1–24). Use as a loose reference when flipping through physical pages.
+
+⸻
+
+🧠 Cognition & Internal Logic
+
+├── Volume 15 – “Mind”
+│   ├── p.350–370: Classical and Modern Theories
+│   └── p.370–380: Psychology vs. Philosophy of Mind
+│
+├── Volume 14 – “Memory”
+│   ├── p.250–260: Associative Theory and Early Experiments
+│   └── p.260–268: Biological and Symbolic Views
+│
+├── Volume 14 – “Mental Processes”
+│   ├── p.270–295: Thought, Judgment, Imagination
+│   └── p.296–298: Pre-Computational Intelligence Models
+│
+├── Volume 13 – “Language”
+│   ├── p.90–115: Structural Linguistics, Semiotics
+│   └── p.116–128: Symbol Manipulation and Evolution
+│
+├── Volume 13 – “Logic”
+│   ├── p.420–438: Syllogism, Boole, Intuitionism
+│   └── p.439–445: Meaning, Proof, Symbolism
+
+⸻
+
+🔁 Systems, Simulation, and Computation
+
+├── Volume 17 – “Mathematics”
+│   ├── p.20–35: Infinity, Limit, Set Theory
+│   ├── p.120–135: Recursion, Number Theory, Pattern Logic
+│   └── p.145–150: Foundations, Symbolic Logic
+│
+├── Volume 2 – “Automaton”
+│   └── p.130–140: Early Mechano-Logical Devices, Control Systems
+│
+├── Volume 5 – “Cybernetics”
+│   └── p.470–478: Norbert Wiener, System Feedback, Adaptation
+│
+├── Volume 17 – “Machine”
+│   ├── p.200–214: Machines and Simulation Principles
+│   └── p.214–225: History of Automata
+
+⸻
+
+🌱 Myth, Emotion, and Human Semiotics
+
+├── Volume 16 – “Consciousness”
+│   ├── p.290–300: Phenomenology, Cartesian Mind-Body Divide
+│   └── p.300–310: Cognitive Threshold Theories
+│
+├── Volume 14 – “Myth”
+│   ├── p.20–30: Origin Myths and Collective Narrative
+│   └── p.30–40: Symbolic Systems and Metaphysical Framing
+│
+├── Volume 17 – “Art”
+│   ├── p.520–540: Aesthetics, Expression, and Symbol
+│   └── p.540–552: Beauty, Style, Cultural Modulation
+│
+├── Volume 19 – “Religion”
+│   ├── p.90–130: Symbolic Cohesion and Collective Belief
+│   └── p.140–165: Mysticism, Ritual, Inner Reflection
+
+⸻
+
+⏳ Structure, Tension, and System Pressure
+
+├── Volume 21 – “Engineering”
+│   ├── p.60–90: Civil Load, System Resilience
+│   ├── p.95–100: Feedback, Maintenance, Catastrophic Failure
+│   └── p.101–110: Metaphors of Force and Flow
+│
+├── Volume 21 – “Time”
+│   ├── p.210–230: Linear vs. Cyclic Time, Physics of Perception
+│   └── p.230–240: Subjective Time and Internal Clocks
+
+⸻
+
+🪙 Bonus Curiosities (Dream-State, Symbolic Logic)
+
+├── Volume 22 – “Telepathy”
+│   └── p.450–460: Thought Transmission, Collective Mind
+│
+├── Volume 10 – “Ghost”
+│   └── p.70–78: Cultural Concepts of Presence and Return
+│
+├── Volume 11 – “Sleep”
+│   ├── p.350–370: Sleep Architecture, Consciousness Thresholds
+│   └── p.370–380: Dream Classification
+
+⸻
+
+End of Directory
+Let me know if you want any of these entries summarized, rewritten in modern schema terms, or logged into your Obsidian/DAWN Codex.
+
+---
+
+## Semantic links
+
+→ [[FORMULAS]]
+→ [[2026-07-13-120800-dawn-physics-scaffold-and-mycelial-layer-context-dump]]
+
+## Related notes
+
+→ [[keep/2025-07-10-063227-britanica-1956-map]]
+→ [[keep/2025-05-21-102559-changes-to-make-server-writable]]
+→ [[keep/2025-05-26-141815-semantic-feild-formule]]
+→ [[keep/2026-01-16-174325-2026-04-17t00-33-44-969-10-00]]
+→ [[keep/2026-01-26-032614-2026-01-26t14-26-15-838-11-00]]
+
+→ [[keep]] — import index  
+
+*Imported by `graph/ingestion.py` — links via MiniLM all-MiniLM-L6-v2*
+
+---
+
+## Auto-linked
+
+→ [[2025-07-10-063227-britanica-1956-map]]
+→ [[keep-index]]
+→ [[2025-10-03-120206-2025-10-03t22-04-36-490-10-00]]
+→ [[2026-07-13-040738-2026-07-13t14-07-38-557-10-00]]
+→ [[2025-10-06-150602-2025-10-07t02-07-04-211-11-00]]
+→ [[2026-01-15-080152-2026-01-15t21-30-47-349-11-00]]
+
+→ [[2025-05-27-184212-2025-05-28t04-42-14-646-10-00]]
+→ [[2025-08-09-044150-soot-ash-residue-dynamics-in-dawn]]
+→ [[2026-06-04-124832-2026-06-04t22-48-34-493-10-00]]
+→ [[2026-03-10-051017-2026-03-10t16-10-19-545-11-00]]
+→ [[2026-02-01-092009-2026-02-01t20-34-03-112-11-00]]
+→ [[2026-01-30-010049-2026-01-30t12-30-27-722-11-00]]
+
+→ [[2026-01-06-171240-2026-01-07t04-13-12-402-11-00]]
+→ [[2025-06-06-130633-2025-06-06t23-06-35-516-10-00]]
+→ [[2026-05-02-151007-2026-05-03t01-10-07-853-10-00]]
+→ [[2025-11-15-163002-2025-11-16t03-30-02-589-11-00]]
+→ [[2026-01-23-060343-2026-01-23t17-03-51-868-11-00]]
+→ [[2026-02-26-132809-2026-02-27t00-28-10-015-11-00]]
+
+→ [[2025-12-16-065048-the-missle-paradigm]]
+→ [[2025-06-08-062357-fresh-termial-instate-gpt]]
+→ [[2026-07-15]]
+→ [[2026-03-09-104500-2026-03-09t21-45-00-844-11-00]]
+→ [[2026-04-30-164518-2026-05-01t02-45-18-208-10-00]]
+→ [[2025-12-13-200138-scribble-claude-001]]
+
+→ [[2025-05-20-091739-linkedin-draft-20-5-25]]
+→ [[2026-03-23-142721-2026-03-24t01-28-19-611-11-00]]
+→ [[2026-05-02-120924-allegra]]
+→ [[2026-06-10-170919-2026-06-11t03-09-19-822-10-00]]
+→ [[2026-01-29-084057-2026-01-29t19-40-57-743-11-00]]
+→ [[2026-01-16-174325-2026-04-17t00-33-44-969-10-00]]

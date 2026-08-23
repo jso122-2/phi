@@ -1,0 +1,129 @@
+{
+  "COMMANDS.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:54:33Z",
+    "used": 0
+  },
+  "graph.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:57:11Z",
+    "last_used": "2026-08-20T09:57:11Z",
+    "used": 1
+  },
+  "hub-classifier.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:57:11Z",
+    "last_used": "2026-08-20T09:57:11Z",
+    "used": 1
+  },
+  "keep/2025-05-15-095857-server-schema-architecture-15-5-25.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:10:45Z",
+    "last_used": "2026-08-20T09:10:45Z",
+    "used": 1
+  },
+  "keep/2025-05-22-140420-22-5-25-scvhema-bucketed.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:10:45Z",
+    "last_used": "2026-08-20T09:10:45Z",
+    "used": 1
+  },
+  "keep/2025-11-15-163223-2025-11-16t03-32-26-033-11-00.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:10:45Z",
+    "last_used": "2026-08-20T09:10:45Z",
+    "used": 1
+  },
+  "logger.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:57:11Z",
+    "last_used": "2026-08-20T09:57:11Z",
+    "used": 1
+  },
+  "mcp-server.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:54:33Z",
+    "last_used": "2026-08-20T09:54:33Z",
+    "used": 1
+  },
+  "music/GENRE.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:10:45Z",
+    "last_used": "2026-08-20T09:10:45Z",
+    "used": 1
+  },
+  "sessions/2026-07-13-040611-configure-pushes-to-the-obsidian-graph-and-bu.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:57:11Z",
+    "last_used": "2026-08-20T09:57:11Z",
+    "used": 1
+  },
+  "sessions/2026-07-13-095004-cairrnify-the-mcp-server-fix-dom-queue-open.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:57:11Z",
+    "last_used": "2026-08-20T09:57:11Z",
+    "used": 1
+  },
+  "sessions/2026-07-13-configure-the-obsidian-graph-as-the-hub-buil.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:57:11Z",
+    "last_used": "2026-08-20T09:57:11Z",
+    "used": 2
+  },
+  "sessions/2026-07-15-spotify-pipeline-mcp-cache-queue.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:54:33Z",
+    "used": 0
+  },
+  "sessions/2026-08-20-084936-look-for-time-adjusted-risk-penalised-return.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:10:45Z",
+    "last_used": "2026-08-20T09:10:45Z",
+    "used": 2
+  },
+  "sessions/2026-08-20-091045-how-can-we-use-it-for-phi.md": {
+    "accessed": 0,
+    "amended": 1,
+    "last_amended": "2026-08-20T09:10:45Z",
+    "used": 0
+  },
+  "sessions/2026-08-20-091540-dev-wire-tp-rar-into-phi-ranker.md": {
+    "accessed": 0,
+    "amended": 1,
+    "last_amended": "2026-08-20T09:15:40Z",
+    "used": 0
+  },
+  "sessions/2026-08-20-094108-wire-tp-rar-into-cairrn-catalog-and-phi.md": {
+    "accessed": 0,
+    "amended": 1,
+    "last_amended": "2026-08-20T09:41:08Z",
+    "used": 0
+  },
+  "sessions/2026-08-20-095711-layer-the-vault-into-stations-sessions-ingest.md": {
+    "accessed": 0,
+    "amended": 1,
+    "last_amended": "2026-08-20T09:57:11Z",
+    "used": 0
+  },
+  "source/engine-phi-player.md": {
+    "accessed": 1,
+    "amended": 0,
+    "last_accessed": "2026-08-20T09:10:45Z",
+    "last_used": "2026-08-20T09:10:45Z",
+    "used": 1
+  }
+}

@@ -1,0 +1,12 @@
+# phi_config.example.yaml — copy to phi_config.yaml and fill in your values
+
+meta_enrichment:
+  # AcoustID key is optional — without it the daemon still runs Discogs, Deezer,
+  # Lyrics, Spotify, Last.fm, and Consensus enrichment.
+  # Get a free key at https://acoustid.org/login
+  acoustid_api_key: ""
+  mb_user_agent: "phi/0.3.0 (your@email.com)"
+  confidence_threshold: 0.70    # auto-accept AcoustID match above this score
+  write_back_enabled: true      # write enriched tags back to audio files
+  inter_track_seconds: 1.0      # sleep between tracks to avoid hammering APIs
+  pause_during_playback: true   # if false, enrichment runs even while audio plays

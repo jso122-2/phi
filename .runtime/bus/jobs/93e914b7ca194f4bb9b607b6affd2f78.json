@@ -1,0 +1,1 @@
+{"job_id": "93e914b7ca194f4bb9b607b6affd2f78", "task": "warmup.corpus", "kwargs": {}, "status": "done", "queued_at": 1787357817.837632, "started_at": 1787357817.852944, "result": {"warmed": "corpus", "n_docs": null}, "finished_at": 1787357817.9336698}

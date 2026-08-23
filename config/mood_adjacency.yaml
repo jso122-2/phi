@@ -1,0 +1,41 @@
+# Mood adjacency graph — phi ranker
+#
+# Each mood maps to the set of "adjacent" moods.  Adjacent moods receive a
+# 0.65 affinity score during track selection (vs 1.0 for an exact match and
+# 0.15 for no relationship).
+#
+# Edit this file to tune how the ranker treats mood proximity.
+# Re-launching phi picks up changes automatically (loaded once at import time).
+#
+# Relationship rules of thumb:
+#   - Adjacency should be symmetric where the transition sounds natural.
+#   - Add a mood here to make it visible to the CLAP/Spotify mood pipeline.
+#   - Removing a mood from ALL adjacency lists isolates it (pure-match only).
+
+calm:
+  - chill
+
+chill:
+  - calm
+  - focused
+
+focused:
+  - chill
+  - energetic
+  - happy
+
+energetic:
+  - focused
+  - happy
+  - angry
+
+happy:
+  - focused
+  - energetic
+
+sad:
+  - calm
+  - chill
+
+angry:
+  - energetic

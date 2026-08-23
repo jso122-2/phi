@@ -1,0 +1,1871 @@
+# Formula Dictionary — canonical source of truth
+# Path: config/formulas/formula_dictionary.yaml
+# Updated: 2026-08-20
+#
+# Schema
+#   value_systems  — constants, domains, basins, hubs, gates, guards
+#   formulas       — every named formula (id / expr / variables / output / layer)
+#
+# Each formula entry:
+#   id            — unique identifier (matches code F_* / f_* names)
+#   label         — human-readable name
+#   expr          — canonical mathematical expression
+#   variables     — symbol → system field  (some older entries use `vars`)
+#   output        — what the formula produces
+#   layer         — CAIRRN layer (1=modulation, 2=sharding, 3=coherence, X=composite, Z=z-space)
+#   value_system  — which value_systems.* block owns the constants
+#   source        — origin (desktop image, vault node, or Python module)
+#
+# Two hub geometries exist and MUST NOT be mixed:
+#   station_hubs  — MCP / Obsidian vault ring (HOME→shard 0, MATH→1-2, …)
+#   phi_hubs      — phi CAIRRN ring (agent-context→0, CODE→1, HOME→2, MATH→3, COMMANDS→7)
+
+schema_version: "1.1.0"
+updated: 2026-08-20
+total_formulas_note: "count is the length of the formulas list; regenerate FORMULAS.md from this file"
+
+value_systems:
+
+  physics:
+    description: >
+      Shared physical constants. α and κ are the two numbers every other
+      system is built from. α is the 95% Gaussian z-score manufactured as a
+      double-well attractor; κ is the harmonic-ring coupling (stable iff κ < 0.5).
+    constants:
+      alpha:
+        symbol: α
+        value: 1.96
+        type: float
+        meaning: attractor / well location; 95% Gaussian z-score
+        code: [sims.attractors.ALPHA, phi.engine.cairrn._constants.ALPHA]
+      kappa:
+        symbol: κ
+        value: 0.15
+        type: float
+        domain: (0, 0.5)
+        meaning: harmonic coupling constant (mycelial conductance gain)
+        code: [sims.harmonic.LocalPropagator.coupling, phi.engine.cairrn._constants.KAPPA, workers.cairrn.mycelial._KAPPA]
+      n_shards:
+        symbol: N
+        value: 8
+        type: int
+        meaning: shards in the harmonic ring (indices 0–7)
+        code: [phi.engine.cairrn._constants.N_SHARDS]
+      math_e:
+        symbol: e
+        value: 2.718281828459045
+        type: float
+        meaning: Euler's number — used as a constant in F_FORECAST_SCORE
+      lambert_w_of_1:
+        symbol: W(1)
+        value: 0.5671432904097838
+        type: float
+        meaning: principal Lambert W at 1
+      neg_exp_fixed_point:
+        symbol: x*
+        value: -0.5671432904097838
+        type: float
+        expr: "x* = -W(1)"
+        meaning: stable fixed point of f(x) = −eˣ; |f′(x*)| = W(1) < 1
+        code: [sims.attractors.NEG_EXP_FIXED_POINT]
+      coherence_floor:
+        value: 0.50
+        type: float
+        meaning: soft floor — reroute fires below this
+        code: [phi.engine.cairrn._constants.COHERENCE_FLOOR]
+      euler_floor:
+        value: 0.5671432904097838
+        type: float
+        meaning: hard Euler floor |x*| — hub below this is critical degradation
+        code: [phi.engine.cairrn._constants.EULER_FLOOR]
+      shard_norm:
+        value: 14.44
+        type: float
+        meaning: "normalisation for neg_exp shard map: shard = floor(e^χ · N / SHARD_NORM) clamped to [0, N−1]"
+        code: [phi.engine.cairrn._constants.SHARD_NORM]
+    numeric_guards:
+      div_zero_floor: 1.0e-9
+      pericles_x_floor: 1.0e-12
+      z_floor: 0.01
+      meaning: clamp denominators / |z| away from zero before division
+
+  double_well:
+    description: Symmetric double-well that manufactures ±α as stable states.
+    formulas_owned: [F_DOUBLE_WELL, F_GRADIENT_DESCENT, F_LANGEVIN, F_KRAMERS, F_MFPT]
+    potential:
+      expr: "V(x) = (x² − α²)²"
+      gradient: "V′(x) = 4x(x² − α²)"
+      hessian: "V″(x) = 4(3x² − α²)"
+    fixed_points:
+      - {x: 0.0, stability: unstable_saddle, V_second: "−4α²"}
+      - {x: 1.96, stability: stable, V_second: "8α² > 0"}
+      - {x: -1.96, stability: stable, V_second: "8α² > 0"}
+    defaults:
+      lr: 0.05
+      max_step: 0.5
+      max_iter: 2000
+      tol: 1.0e-6
+    langevin:
+      expr: "x_{n+1} = x_n − lr · V′(x_n) + √(2·D·lr) · ξ    ξ ~ N(0,1)"
+      D: "noise_scale²"
+    kramers:
+      expr: "λ = (ω₀ · ω_s) / 2π · exp(−ΔV / D)"
+      delta_V: {expr: "α⁴", value: 14.7579}
+      omega_0: {expr: "2√2 · α", value: 5.5436}
+      omega_s: {expr: "2α", value: 3.92}
+      gamma: 1.0
+      tau: "1/λ"
+      tau_steps: "τ / lr"
+
+  harmonic_ring:
+    description: >
+      Ring of N shards. Shard i is centred on the (i+1)-th harmonic of α.
+      Local diffusion is stable iff 0 < κ < 0.5. Resonance coupling may go
+      up to κ < 1.0 because it conserves total activation.
+    formulas_owned: [F_HARMONIC_PROPAGATE, F_RESONANCE_PROPAGATE]
+    basin_centres:
+      - {shard: 0, harmonic: 1, centre: 1.96}
+      - {shard: 1, harmonic: 2, centre: 3.92}
+      - {shard: 2, harmonic: 3, centre: 5.88}
+      - {shard: 3, harmonic: 4, centre: 7.84}
+      - {shard: 4, harmonic: 5, centre: 9.80}
+      - {shard: 5, harmonic: 6, centre: 11.76}
+      - {shard: 6, harmonic: 7, centre: 13.72}
+      - {shard: 7, harmonic: 8, centre: 15.68}
+    local_propagate:
+      expr: "a_i(t+1) = a_i(t) + κ · [a_{i−1}(t) + a_{i+1}(t) − 2·a_i(t)]"
+      kappa_default: 0.15
+      kappa_domain: (0, 0.5)
+    resonance_propagate:
+      gate: "gate = −cos(π · a_p / A)"
+      spatial: "s_i = −cos(π · d_i)   d_i = min(|i−p|, N−|i−p|) / (N/2)"
+      weight: "w_i = exp(gate · s_i)"
+      kappa_default: 0.15
+      kappa_domain: (0, 1.0)
+      conserved: true
+
+  station_hubs:
+    description: >
+      MCP / Obsidian vault hub geometry. Used by /hub-inject, /hub-state,
+      and graph_commit index injection. Independent of phi_hubs.
+    mapping:
+      HOME:          {shards: [0],    basins: [1.96]}
+      MATH:          {shards: [1, 2], basins: [3.92, 5.88]}
+      CODE:          {shards: [3, 4], basins: [7.84, 9.80]}
+      COMMANDS:      {shards: [5],    basins: [11.76]}
+      agent-context: {shards: [6, 7], basins: [13.72, 15.68]}
+    code: sims.harmonic.HUB_SHARD_MAP
+
+  phi_hubs:
+    description: >
+      phi CAIRRN hub geometry. Shard = floor(e^χ · N / SHARD_NORM) clamped
+      to [0, N−1]. Waveguide shards 4–6 carry diffused activation only.
+      Do not confuse with station_hubs.
+    formulas_owned: [F_NEG_EXP]
+    mapping:
+      agent-context:
+        chi: 0.0300
+        gravity: 0.50
+        rattling: false
+        decay: 0.90
+        tau: 9.5
+        shard: 0
+        basin: boundary
+      CODE:
+        chi: 0.9900
+        gravity: 1.50
+        rattling: true
+        decay: 0.93
+        tau: 13.8
+        shard: 1
+        basin: mirror
+      HOME:
+        chi: 1.5414
+        gravity: 3.00
+        rattling: false
+        decay: 0.98
+        tau: 49.5
+        shard: 2
+        basin: true_center
+      MATH:
+        chi: 1.9600
+        gravity: 2.00
+        rattling: true
+        decay: 0.95
+        tau: 19.5
+        shard: 3
+        basin: white_peak
+      COMMANDS:
+        chi: 2.6700
+        gravity: 1.00
+        rattling: true
+        decay: 0.90
+        tau: 9.5
+        shard: 7
+        basin: escape
+    tau_expr: "τ = −1 / log(decay)"
+    priority_tiers:
+      0: {label: DEFER,  shards: [0]}
+      1: {label: NORMAL, shards: [1, 2, 3]}
+      2: {label: HIGH,   shards: [4, 5, 6]}
+      3: {label: URGENT, shards: [7]}
+    code: phi.engine.cairrn._constants.HUB_PARAMS
+
+  ana_chi:
+    description: >
+      Jackson's Pocket primitives. 𝒜_χ = 1.5414 is the chameleon constant
+      (true_center). Five basins on χ ∈ [0.03, 2.67]. Three rattling pockets.
+    chameleon_constant:
+      symbol: 𝒜_χ
+      value: 1.5414
+      code: sims.ana_chi.ANA_CHI_CONSTANT
+    sigma: 0.40
+    rattle_decay: 0.50
+    rattle_chi: [0.9900, 1.9600, 2.6700]
+    basins:
+      - {name: boundary,    chi: 0.0300, gravity: 0.50, rattling: false, colour: blue,   memory_decay: 0.90, hub: agent-context}
+      - {name: mirror,      chi: 0.9900, gravity: 1.50, rattling: true,  colour: purple, memory_decay: 0.93, hub: CODE}
+      - {name: true_center, chi: 1.5414, gravity: 3.00, rattling: false, colour: white,  memory_decay: 0.98, hub: HOME}
+      - {name: white_peak,  chi: 1.9600, gravity: 2.00, rattling: true,  colour: red,    memory_decay: 0.95, hub: MATH}
+      - {name: escape,      chi: 2.6700, gravity: 1.00, rattling: true,  colour: orange, memory_decay: 0.90, hub: COMMANDS}
+    cosine_drape: "D(r,s,χ) = [cos(r·s·χ) − cos(r·s·χ + 0.01)] × 100"
+    rattling_proximity: "P(χ) = exp(−|χ − χ_rattle| / 0.5)"
+    temporal_decay: "rate(g) = 0.90 + clamp(g/5, 0, 1) × 0.08"
+    multi_basin_potential: "V(χ) = −Σ_i  gravity_i · exp(−(χ − χ_i)² / 2σ²)"
+
+  cairrn_layers:
+    description: Pipeline layers that tag every formula.entry.layer
+    layers:
+      1: {name: modulation,           meaning: Ana-Chi energy / height / friction}
+      2: {name: sharding,             meaning: neg_exp map onto the harmonic ring}
+      3: {name: coherence,            meaning: SHI / delta / consensus enforcement}
+      X: {name: composite_constraint, meaning: cross-layer scores and gates}
+      Z: {name: z_space,              meaning: SCOP spatial scoring (−Z)}
+
+  e5_gate:
+    description: Ohm's-law emission gate. e5 gates the system; e4 gates the track.
+    formulas_owned: [F_E5, F_E4, F_K_SIGIL, F_CC, F_E5_LOAD_LINE]
+    open_threshold: 0.1
+    marginal_threshold: -0.1
+    bc_max: 20
+    decisions:
+      OPEN:     "e5 >  0.1"
+      MARGINAL: "e5 > -0.1"
+      BLOCKED:  "e5 < -0.1"
+    load_line: "V/R_min = arctanh(0.1) + Bc / 20  ≈  0.1003 + Bc/20"
+    e5_expr: "e5 = tanh( (H + K) / (G − energy_dot) − Bc / bc_max )"
+    e4_expr: "e4 = |e5 / (−z)| + Cc − 1     (emits when e4 > 0)"
+    k_sigil_expr: "k = (H + Cc) − G"
+    cc_expr: "Cc = ((c − A) / p) · Tcv"
+    code: workers.cairrn.formulas
+
+  d_friction_gate:
+    description: Suppresses should_act when local friction delta is too high.
+    expr: "D = |fl − (Ti · |x/Z| + βt)|"
+    local_friction: 0.5
+    d_gate_threshold: 1.0
+    z_floor: 0.01
+    rule: "D > D_GATE_THRESHOLD → gate suppresses action"
+    code: phi.engine.cairrn._constants
+
+  mycelial:
+    description: Living metabolic substrate on the CAIRRN node graph.
+    formulas_owned: [F_HEBBIAN_LEARNING, F_CONNECTION_DECAY, F_SPORE_ENERGY_DECAY, F_ADAPTIVE_CAPACITY, F_MYCELIAL_DEMAND, F_NUTRIENT_ALLOC, F_METABOLISE, F_CONDUCTANCE]
+    constants:
+      kappa:           {symbol: κ,         value: 0.15, meaning: sigmoid gain in conductance}
+      theta_grow:      {symbol: θ_grow,    value: 0.30, meaning: min energy to open Growth Gate}
+      theta_sim:       {symbol: θ_sim,     value: 0.25, meaning: min semantic similarity for a new edge}
+      theta_prune:     {symbol: θ_prune,   value: 0.10, meaning: starvation floor → autophagy}
+      tau_ticks:       {symbol: τ_ticks,   value: 3,    meaning: consecutive starved ticks before autophagy}
+      eta:             {symbol: η,         value: 0.80, meaning: nutrients → energy conversion rate}
+      e_max:           {symbol: E_max,     value: 1.00, meaning: energy ceiling per node}
+      basal_cost:      {value: 0.02, meaning: metabolic cost subtracted every tick}
+      gamma:           {symbol: γ,         value: 0.50, meaning: active transport gain}
+      alpha_hebbian:   {symbol: α_hebb,    value: 0.10, meaning: Hebbian learning rate (NOT physics α)}
+      beta_decay:      {symbol: β,         value: 0.05, meaning: temporal decay weight on w_ij}
+      chi_w:           {symbol: χ_w,       value: 0.03, meaning: entropy suppression weight on w_ij}
+      absorption_rate: {value: 0.20}
+      fusion_bonus:    {value: 0.15}
+      fission_rate:    {value: 0.25}
+    demand_weights:
+      w_pressure: 0.40
+      w_drift: 0.25
+      w_recency: 0.20
+      w_entropy: 0.15
+    demand_expr: "D_i = wP·P_i + wΔ·drift_align_i + wR·recency_i − wσ·σ_i"
+    code: workers.cairrn.mycelial
+
+  dawn_confidence:
+    description: >
+      DAWN confidence x. Nested variable used as the imaginary / superposition
+      state of DAWN — a cloud of possibility, not a pinpointed measured
+      confidence. Feeds Pericles as the denominator, and the r1–r6 nested
+      stack as x_i.
+    formulas_owned: [F_DAWN_CONFIDENCE, F_JULES_NORM]
+    expr: "x = |k · j'| ∨ D"
+    vee: "∨ = max / logical-OR over magnitudes"
+    k:
+      symbol: K
+      meaning: dawn neuro activation
+      type: float
+    j_prime:
+      symbol: j'
+      meaning: normalised Jules
+      pipeline:
+        - "take raw Jules J to millijoule precision (0.001)"
+        - "normalise; take the 0.00 baseline out (min-shift so focused floor is exactly 0.00)"
+      expr: "j' = J_q − min(J_q)     J_q = round(J, 3)"
+      millijoule: 0.001
+      zero_baseline: 0.00
+    D:
+      symbol: D
+      meaning: delta vector of variable drift
+      type: vector
+      hotswappable: true
+      note: >
+        Drift implementation is hot-swappable. Current /find default is the
+        positive half-sine iwave D = sin(π · β / 2), but any drift vector
+        (semantic, embedding, mycelial Δ) may be substituted without changing x.
+    code: psspps.find._pericles
+    source: keep/2026-03-24-234438 (x is a formula for DAWN confidence)
+
+  pericles:
+    description: Exact-retrieval re-score used by /find. No room for error.
+    formulas_owned: [F_PERICLES]
+    expr: "per = |tc_A − Adp_At| · k / x"
+    x: F_DAWN_CONFIDENCE
+    x_expr: "x = |k · j'| ∨ D     (DAWN confidence)"
+    pipeline:
+      - top-5 by combined semantic+harmonic score
+      - Pericles re-score
+      - top-3 to operator
+      - 1 final answer
+    combined_score_alpha: 0.5
+    code: psspps.find._pericles
+
+  psspps:
+    description: Pre-route → retrieve → semantic+harmonic perspective → post-route.
+    perspective_alpha:
+      default: 0.5
+      domain: [0.0, 1.0]
+      meaning: "0.0 = pure TF-IDF semantic; 1.0 = pure harmonic perspective"
+    top_k_default: 3
+
+  variable_domains:
+    description: Recurring domains for symbols that appear across many formulas.
+    unit_interval:  {domain: "[0, 1]", examples: [likelihood, possibility, confidence, tracer_consensus, sigma, recency]}
+    boolean_temporal: {domain: "{0, 1}", examples: [x in F_SCOPE_NAV]}
+    shard_index:    {domain: "[0, 7]", type: int}
+    pressure:       {domain: "≥ 0", examples: [p, beta_t, cognitive_pressure]}
+    energy:         {domain: "typically [0, 1] or unbounded ≥ 0", note: "routing energy ≠ mycelial metabolic energy"}
+    shi:            {domain: "> 0", meaning: Schema Health Index}
+    activation:     {domain: "ℝ, typically ≥ 0"}
+
+formulas:
+  # ────────────────────────────────────────────────────────────────────────────
+  # DESKTOP FORMULAS  (new, from envelope photos)
+  # ────────────────────────────────────────────────────────────────────────────
+
+  - id: F_CONSTRAINT_VAR
+    label: Constraint Variable
+    expr: "x_c = Lh / P - O"
+    variables:
+      Lh: likelihood          # float [0,1]
+      P:  possibility         # float [0,1]
+      O:  opportunity_cost    # float
+    output: x_c               # constraint variable fed into F_FORECAST_SCORE
+    layer: X
+    source: "1765368575652.jpg"
+
+  - id: F_FORECAST_SCORE
+    label: Forecast Score
+    expr: "score = |(D - e) / x_c| * T * delta_j"
+    variables:
+      D:       forecasting_result   # float, percentage [0,1]
+      e:       math_e               # constant 2.71828...
+      x_c:     constraint_variable  # output of F_CONSTRAINT_VAR
+      T:       temporal_validator   # float
+      delta_j: energy_available     # float, Δj energy delta
+    output: score
+    layer: X
+    source: "1765368575652.jpg"
+
+  - id: F_SCOPE_NAV
+    label: Scope Navigation Score
+    expr: "z = ||A + J| - beta| * x / sqrt(D)"
+    variables:
+      A:    current_node            # float, semantic position
+      J:    current_objective       # float
+      beta: energy_to_move          # float, energy required to reach desired node
+      x:    boolean_temporal        # int {0, 1}
+      D:    SHI                     # Semantic Hash Index (float > 0)
+    output: z                       # scope coordinate
+    layer: 2
+    source: "1765368575713.jpg"
+
+  - id: F_LOCATION_ROUTE
+    label: Location Routing Score
+    expr: "R_loc = |x / F| * |T * sum(D_w[i], i=1..n)|"
+    variables:
+      x:   location          # float, spatial coordinate
+      F:   energy_projected  # float
+      T:   ticks_to_move     # int
+      D_w: distance_per_waypoint  # list[float], one entry per waypoint
+    output: R_loc
+    layer: 2
+    source: "1765509979533.jpg"
+
+  - id: F_ENERGY_WEIGHTED
+    label: Weighted Energy Sum
+    expr: "EW = sum( |x_i - z_i| / A * T_Dw_i, i=1..n ) * n_w"
+    variables:
+      x_i:   energy_i             # float per node
+      z_i:   desirability_cost_i  # float per node
+      A:     resources            # float
+      T_Dw:  distance_weighted_time   # list[float], one per node
+      n_w:   positive_normalisation   # float > 0
+    output: EW
+    layer: 1
+    source: "1765509991901.jpg"
+
+  - id: F_CAIRRN_COMPOSITE
+    label: CAIRRN Composite Score
+    expr: "Psi = |z + x| * |1 - c| - |z + x| * |y - c| + Ti"
+    variables:
+      z:  confidence      # float [0,1]  (SCOP confidence)
+      x:  scope           # float        (SCUP coordinate)
+      y:  dawn_data       # float        (DAWN state value)
+      c:  energy_cost     # float        (metabolic cost)
+      Ti: tick_interval   # int          (current tick #)
+    output: Psi           # CAIRRN composite score
+    layer: X
+    source: "1765537045100.jpg"
+
+  - id: F_DELTA_TWO
+    label: Second-Order Delta
+    expr: "delta2 = |D_n + T| / |d_p| * O / T"
+    variables:
+      D_n: semantic_distance    # float, D_n
+      T:   time_steps           # int/float
+      d_p: pressure_gradient    # float, ∂p
+      O:   opportunity_cost     # float
+    output: delta2              # δ₂, second-order pressure/distance delta
+    layer: 3
+    source: "1765537045100.jpg"
+
+  - id: F_ENERGY_CONSUMPTION
+    label: Energy Consumption Score
+    expr: "Ec = (|C - A| * T / p) * Tcv"
+    variables:
+      C:   required_energy           # float, cognitive energy required
+      A:   current_position          # float, total current position value
+      T:   temporal_validator        # float, time factor
+      p:   performance               # float [0,1]
+      Tcv: tracer_consensus_value    # float
+    output: Ec
+    layer: 1
+    source: "1765602667244.jpg"
+
+  - id: F_TRACER_CONSENSUS_K
+    label: Tracer Consensus Delta
+    expr: "K = |Tcv| - D"
+    variables:
+      Tcv: tracer_consensus_value  # float
+      D:   SHI                     # Semantic Hash Index
+    output: K                      # tracer consensus delta / weight factor for Tws
+    layer: 3
+    source: "1765602667244.jpg"
+
+  - id: F_HEIGHT_NODE
+    label: Height Node Component
+    expr: "H = |g + A| - Tcv"
+    variables:
+      g:   global_friction         # float, system-wide resistance
+      A:   current_mode            # float, current SCUP/mode coordinate
+      Tcv: tracer_consensus_value  # float
+    output: H                      # height component
+    layer: 1
+    source: "1765602671643.jpg"
+
+  - id: F_GLOBAL_RZONE
+    label: Global R-Zone Component
+    expr: "G = |r^2| / d_beta * Tcv - beta"
+    variables:
+      r:      rzone_coordinate      # float, R-zone spatial position
+      d_beta: pressure_gradient     # float, ∂β (pressure derivative)
+      Tcv:    tracer_consensus_value # float
+      beta:   SHI                   # Semantic Hash Index (δ₁)
+    output: G                       # global R-zone component
+    layer: 1
+    source: "1765602671643.jpg"
+
+  - id: F_TICK_WISDOM
+    label: Tick Wisdom Score
+    expr: "Tws = Tn / K   where Tn >= Tip"
+    variables:
+      Tn:  tracer_at_n    # float, tracer value at tick n
+      Tip: tip_value      # float, minimum tip threshold
+      K:   tracer_consensus_delta  # float, output of F_TRACER_CONSENSUS_K
+    output: Tws           # tracer wisdom score (tick interval present)
+    layer: 3
+    source: "1765602681971.jpg"
+
+  - id: F_LOCAL_FRICTION_D
+    label: Local Friction Delta Score
+    expr: "fl = |delta_z - Tks| * (x / z) + beta"
+    variables:
+      delta_z: local_friction       # float, δz local friction component
+      Tks:     tick_weighted_sum    # float, tick-weighted accumulator
+      x:       confidence           # float [0,1]
+      z:       SCOP                 # float, SCOP coordinate
+      beta:    pressure             # float, cognitive pressure (SHI-derived)
+    output: fl
+    layer: 1
+    source: "1765602681971.jpg"
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # EXISTING FORMULAS  (from FORMULAS.md / prior system)
+  # ────────────────────────────────────────────────────────────────────────────
+
+  - id: F_SCUP_FULL
+    label: SCUP Coherence (full)
+    expr: "SCUP = sigma(b*P_hat + c*e + d*f + Δdrift + a*tau_bar + SHI*F_star)"
+    variables:
+      P_hat:    pressure_normalized
+      c:        consumption
+      e:        energy
+      d:        decay_factor
+      f:        friction
+      delta_drift: semantic_drift
+      a:        activation
+      tau_bar:  average_latency
+      SHI:      semantic_hash_index
+      F_star:   forecast_smoothed
+      b:        weight_pressure
+    output: SCUP
+    layer: 3
+    source: existing
+
+  - id: F_CORE_TRANSFORMATION
+    label: Core Transformation
+    expr: "k = G + H + Cc"
+    variables:
+      G:  global_component
+      H:  height_component
+      Cc: consumption_component
+    output: k
+    layer: X
+    source: existing
+
+  - id: F_HEIGHT
+    label: Height Component
+    expr: "H = |y + A| * Tcv"
+    variables:
+      y:   scup_coordinate
+      A:   tag_set_A
+      Tcv: tracer_consensus_value
+    output: H
+    layer: 1
+    source: existing
+
+  - id: F_GLOBAL
+    label: Global Component
+    expr: "G = r * j * f1"
+    variables:
+      r:  rhizomic_coordinate
+      j:  density
+      f1: SHI
+    output: G
+    layer: 1
+    source: existing
+
+  - id: F_CONSUMPTION
+    label: Consumption Component
+    expr: "Cc = c * p * Tcv"
+    variables:
+      c:   consumption
+      p:   performance
+      Tcv: tracer_consensus_value
+    output: Cc
+    layer: 1
+    source: existing
+
+  - id: F_LOCAL_FRICTION
+    label: Local Friction
+    expr: "fl = C / A"
+    variables:
+      C: required_energy
+      A: tag_set_A
+    output: fl
+    layer: 1
+    source: existing
+
+  - id: F_TRACER_WISDOM
+    label: Tracer Wisdom Score
+    expr: "Tws = (Tn / Tcurrent) * exp(-lambda * (Tcurrent - Tn)) * Tip * K"
+    variables:
+      Tn:       tracer_node
+      Tcurrent: current_time
+      Tip:      tip_value
+      K:        weight_factor
+      lambda:   decay_rate
+    output: Tws
+    layer: 3
+    source: existing
+
+  - id: F_DECISION
+    label: Decision Value
+    expr: "D = Tws * x / (z + fl)"
+    variables:
+      Tws: tracer_wisdom_score
+      x:   confidence
+      z:   uncertainty
+      fl:  local_friction
+    output: D
+    layer: X
+    source: existing
+
+  - id: F_FORECAST_INDEX
+    label: Forecast Index
+    expr: "F = P / A"
+    variables:
+      P: cognitive_pressure
+      A: tag_set_A
+    output: F
+    layer: X
+    source: existing
+
+  - id: F_PRESSURE_NORMALIZED
+    label: Normalized Cognitive Pressure
+    expr: "P_hat = P / P_safe"
+    variables:
+      P:      cognitive_pressure
+      P_safe: safe_threshold
+    output: P_hat
+    layer: X
+    source: existing
+
+  - id: F_SCUP_DECAY
+    label: SCUP Decay
+    expr: "SCUP_t = SCUP_0 * exp(-lambda * t)"
+    variables:
+      SCUP_0: initial_scup
+      lambda: decay_rate
+      t:      target
+    output: SCUP_t
+    layer: 3
+    source: existing
+
+  - id: F_ROUTING_SPEED
+    label: Routing Speed
+    expr: "f_speed = e / (d * t)"
+    variables:
+      e: energy
+      d: decay_factor
+      t: target
+    output: f_speed
+    layer: 2
+    source: existing
+
+  - id: F_COGNITIVE_PRESSURE
+    label: Cognitive Pressure
+    expr: "P = |A - B| * sigma2"
+    variables:
+      A:      tag_set_A
+      B:      tag_set_B
+      sigma2: variance
+    output: P
+    layer: X
+    source: existing
+
+  - id: F_TILT
+    label: Tilt
+    expr: "tilt = T * x * f / (d * z * a)"
+    variables:
+      T: temperature
+      x: confidence
+      f: friction
+      d: decay_factor
+      z: uncertainty
+      a: activation
+    output: tilt
+    layer: X
+    source: existing
+
+  - id: F_RADIAL_POSITION
+    label: Radial Position
+    expr: "R_node = alpha * A_count + beta * C_relevance + gamma * S_feedback"
+    variables:
+      alpha:       alpha
+      A_count:     activation_count
+      beta:        beta_weight
+      C_relevance: context_relevance
+      gamma:       gamma_weight
+      S_feedback:  success_feedback
+    output: R_node
+    layer: X
+    source: existing
+
+  - id: F_ADAPTIVE_CAPACITY
+    label: Adaptive Capacity
+    expr: "AC = w_N * N + w_S * M_SHI + w_T * S_T + A"
+    variables:
+      w_N:  weight_nutrient
+      N:    nutrient_headroom
+      w_S:  weight_shi
+      M_SHI: shi_margin
+      w_T:  weight_tracer
+      S_T:  tracer_slack
+      A:    tag_set_A
+    output: AC
+    layer: X
+    source: existing
+    code:
+      - workers.cairrn.mycelial.f_adaptive_capacity
+      - workers.cairrn.f_adaptive_capacity
+      - phi.core.ranker.adaptive_capacity
+
+  - id: F_FORECAST_SMOOTHED
+    label: Forecast Smoothed
+    expr: "F_star = alpha * F + (1 - alpha) * F_star_prev"
+    variables:
+      alpha:       alpha
+      F:           forecast_index
+      F_star_prev: forecast_smoothed_previous
+    output: F_star
+    layer: X
+    source: existing
+
+  - id: F_JACCARD_AFFINITY
+    label: Jaccard Affinity
+    expr: "affinity = |A & B| / |A | B|"
+    variables:
+      A: tag_set_A
+      B: tag_set_B
+    output: affinity
+    layer: X
+    source: existing
+
+  - id: F_LOCAL_COHERENCE
+    label: Local Coherence
+    expr: "C_i = sum(w_ij * sim(e_i, e_j) / dist_x(i,j), j in N(i))"
+    variables:
+      w_ij:      connection_weight
+      N_i:       neighborhood
+      dist_x_ij: spatial_distance
+    output: C_i
+    layer: 3
+    source: existing
+
+  - id: F_HEBBIAN_LEARNING
+    label: Hebbian Learning
+    expr: "delta_w_ij = eta * a_i * a_j"
+    variables:
+      eta: learning_rate
+      a_i: activation_i
+      a_j: activation_j
+    output: delta_w_ij
+    layer: X
+    source: existing
+
+  - id: F_CONNECTION_DECAY
+    label: Connection Decay
+    expr: "strength = strength * (1 - decay_rate)"
+    variables:
+      strength:   connection_strength
+      decay_rate: decay_rate
+    output: strength
+    layer: X
+    source: existing
+
+  - id: F_SPORE_ENERGY_DECAY
+    label: Spore Energy Decay
+    expr: "E_new = E_old * exp(-decay_rate)"
+    variables:
+      E_old:      old_energy
+      decay_rate: decay_rate
+    output: E_new
+    layer: X
+    source: existing
+
+  - id: F_CACHE_EVICTION
+    label: Cache Eviction Score
+    expr: "Keep_Score = dynamic_priority * mycelial_position_score / time_decay"
+    variables:
+      dynamic_priority:      dynamic_priority
+      mycelial_position_score: position_score
+      time_decay:            time_decay
+    output: Keep_Score
+    layer: X
+    source: existing
+
+  - id: F_SUBSTRATE_MODIFICATION
+    label: Substrate Modification
+    expr: "a_new = a + h + f * C"
+    variables:
+      a: activation
+      h: local_friction
+      f: friction
+      C: required_energy
+    output: a_new
+    layer: X
+    source: existing
+
+  - id: F_SQUARE_ROOT
+    label: Square Root Transform
+    expr: "a = sqrt(R) * SC"
+    variables:
+      R:  resource
+      SC: scaling_constant
+    output: a
+    layer: X
+    source: existing
+
+  - id: F_EMERGENCE_TIMING
+    label: Emergence Timing
+    expr: "emergence_interval = t / (SCUP * n * tick_speed)"
+    variables:
+      t:          target
+      SCUP:       consciousness_coherence
+      n:          tracer_identity
+      tick_speed: tick_speed
+    output: emergence_interval
+    layer: X
+    source: existing
+
+  - id: F_TRACER_ORCHESTRATION
+    label: Tracer Orchestration
+    expr: "result = P * x / t"
+    variables:
+      P: cognitive_pressure
+      x: confidence
+      t: target
+    output: result
+    layer: X
+    source: existing
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # BATCH 2 FORMULAS  (from green notebook + envelope photos, 2026-07-21)
+  # Full canonical YAML in ~/Downloads/formulas/formulas_batch2.yaml
+  # ────────────────────────────────────────────────────────────────────────────
+
+  - id: F_MANIFOLD
+    label: Manifold Score
+    expr: "(M / n) * abs(Fx / Fg) * omega"
+    variables:
+      M: manifold_mass
+      n: manifold_count
+      Fx: x_force
+      Fg: gravitational_force
+      omega: angular_frequency
+    output: manifold
+    layer: 2
+    source: "IMG_20260719_144304.jpg"
+
+  - id: F_SQUASHED_SPACE
+    label: Squashed Space Result
+    expr: "(e_val - 10) / 1"
+    variables:
+      e_val: epoch_value
+    output: H_sq
+    layer: X
+    source: "IMG_20260719_144304.jpg"
+
+  - id: F_SEMANTIC_DRIFT
+    label: Semantic Drift Vector
+    expr: "grad_S_t - grad_S_prev"
+    variables:
+      grad_S_t: semantic_gradient_t
+      grad_S_prev: semantic_gradient_prev
+    output: delta_drift
+    layer: 3
+    source: "IMG_20260719_143951.jpg"
+
+  - id: F_PULSE_PRESSURE
+    label: Pulse Pressure
+    expr: "delta_entropy_alignment / (Dr * Rf)"
+    variables:
+      delta_entropy_alignment: entropy_alignment_delta
+      Dr: directional_resolution
+      Rf: reflection_factor
+    output: P_pulse
+    layer: X
+    source: "IMG_20260719_143951.jpg"
+
+  - id: F_REFLECTION_TENSION
+    label: Reflection Girdle Tension
+    expr: "sum(abs(P_i * delta_mood_i))"
+    variables:
+      P_i: pressure_at_node_i
+      delta_mood_i: mood_change_at_node_i
+    output: T_inhat
+    layer: 1
+    source: "IMG_20260719_143951.jpg"
+
+  - id: F_BLOOM_PRESSURE
+    label: Bloom Cognitive Pressure
+    expr: "B * O * alpha * D_se"
+    variables:
+      B: bloom_mass
+      O: output_mass
+      alpha: directional_radial
+      D_se: decay_sigmoid_ephimerality
+    output: P_bloom
+    layer: 1
+    source: "IMG_20260719_144002.jpg"
+
+  - id: F_CONFIDENCE_SCORE
+    label: Confidence Score
+    expr: "alpha * H_E + beta * R_E + gamma * CR_E"
+    variables:
+      alpha: weight_alpha
+      H_E: height_evidence
+      beta: weight_beta
+      R_E: return_evidence
+      gamma: weight_gamma
+      CR_E: context_relevance_evidence
+    output: C_E
+    layer: X
+    source: "IMG_20260719_144049.jpg"
+
+  - id: F_TP_RAR
+    label: Time-Penalised Risk Adjusted Return
+    expr: "(C_E - (1 - cl_E) * lam - dt * p) / TP_RAR_conf_ma"
+    variables:
+      C_E: confidence_score
+      cl_E: confidence_level
+      lam: decay_rate
+      dt: time_delta
+      p: pressure
+      TP_RAR_conf_ma: tp_rar_moving_average
+    output: TP_RAR_E
+    layer: X
+    source: "IMG_20260719_144049.jpg"
+    code:
+      - workers.cairrn.formulas.f_tp_rar
+      - phi.core.ranker.tp_rar_score
+
+  - id: F_MODEL_ACTIVATION
+    label: Model Activation Gate
+    expr: "1 if C_E >= C_min and R_E >= R_max else 0"
+    variables:
+      C_E: confidence_score
+      C_min: confidence_min
+      R_E: return_evidence
+      R_max: return_max_threshold
+    output: A_E
+    layer: X
+    source: "IMG_20260719_144049.jpg"
+
+  - id: F_SECONDARY_MODEL_SELECT
+    label: Secondary Model Selector
+    expr: "1 if TP_RAR_Pi < TP_RAR_optimal else 0"
+    variables:
+      TP_RAR_Pi: tp_rar_at_pi
+      TP_RAR_optimal: tp_rar_optimal
+    output: MS_i
+    layer: X
+    source: "IMG_20260719_144049.jpg"
+    code:
+      - workers.cairrn.formulas.f_secondary_model_select
+      - workers.cairrn.f_secondary_model_select
+
+  - id: F_COGNITIVE_GRAVITY
+    label: Cognitive Gravity Field
+    expr: "d/dr [ sum(SCUP_i * delta_a_i / entropy_i) ]"
+    variables:
+      r: position
+      SCUP_i: scup_at_node_i
+      delta_a_i: activation_change_i
+      entropy_i: local_entropy_i
+      n: node_count
+    output: g_r
+    layer: X
+    source: "IMG_20260719_143954.jpg"
+
+  - id: F_ATTRACTION_WEIGHT
+    label: Attraction Weight
+    expr: "abs(abs(z - c) / beta_g) * abs(beta_k + A + 1)"
+    variables:
+      z: uncertainty
+      c: energy_cost
+      beta_g: beta_gravity
+      beta_k: beta_key
+      A: activation
+    output: A_w
+    layer: 1
+    source: "IMG_20260719_144239.jpg"
+
+  - id: F_ROUTE_R1
+    label: Route Component r1
+    expr: "f * abs(1 - x) * T"
+    variables:
+      f: friction
+      x: confidence
+      T: time_steps
+    output: r1
+    layer: 2
+    source: "IMG_20260719_144239.jpg"
+
+  - id: F_ROUTE_R2
+    label: Route Component r2
+    expr: "f_norm * (T - x)"
+    variables:
+      f_norm: friction_normalised
+      T: time_steps
+      x: confidence
+    output: r2
+    layer: 2
+    source: "IMG_20260719_144239.jpg"
+
+  - id: F_ROUTE_R3
+    label: Route Component r3
+    expr: "beta_g * (T - x)"
+    variables:
+      beta_g: beta_gravity
+      T: time_steps
+      x: confidence
+    output: r3
+    layer: 2
+    source: "IMG_20260719_144239.jpg"
+
+  - id: F_ROUTE_R4
+    label: Route Component r4
+    expr: "beta_m * abs(1 - x) ** N"
+    variables:
+      beta_m: beta_mass
+      x: confidence
+      N: exponent
+    output: r4
+    layer: 2
+    source: "IMG_20260719_144239.jpg"
+
+  - id: F_ROUTE_R5
+    label: Route Component r5
+    expr: "f * R * (T - x) * fl / r"
+    variables:
+      f: friction
+      R: resource
+      T: time_steps
+      x: confidence
+      fl: local_friction
+      r: rhizomic_coordinate
+    output: r5
+    layer: 2
+    source: "IMG_20260719_144239.jpg"
+
+  - id: F_CAIRRN_Z_SPACE
+    label: CAIRRN Spatial Z
+    expr: "(M_ij / d_1) * (A - c + z) / r_ij * sigma_sum"
+    variables:
+      M_ij: semantic_matrix_ij
+      d_1: partial_derivative_1
+      A: activation
+      c: energy_cost
+      z: uncertainty
+      r_ij: rizomic_distance_ij
+      sigma_sum: sigma_accumulator
+    output: neg_Z
+    layer: X
+    source: "IMG_20260719_143937.jpg"
+
+  - id: F_HANDOFF
+    label: Smooth State Handoff
+    expr: "(C_Si * R_Pi) / (C_Ri * R_Si)"
+    variables:
+      C_Si: coherence_current_state
+      R_Pi: rated_potential
+      C_Ri: coherence_rated
+      R_Si: state_rating
+    output: handoff
+    layer: X
+    source: "IMG_20260719_144042.jpg"
+
+  - id: F_RESOURCE_ALLOC
+    label: Dynamic Resource Allocation
+    expr: "sum(C_Si * U_Pi) / sum(C_Ski * U_Pi)"
+    variables:
+      C_Si: coherence_current_state_i
+      U_Pi: utility_potential_i
+      C_Ski: coherence_state_k_i
+    output: alloc_Si
+    layer: X
+    source: "IMG_20260719_144042.jpg"
+
+  - id: F_NUTRIENT_FLOW
+    label: Fractal Nutrient Flow
+    expr: "eta * Complexity_E * softEdge_config"
+    variables:
+      eta: learning_rate
+      Complexity_E: complexity_edge
+      softEdge_config: soft_edge_config
+    output: N_flow
+    layer: 1
+    source: "IMG_20260719_144042.jpg"
+
+  - id: F_VOLCANIC_ASH
+    label: Volcanic Ash Reinforcement
+    expr: "sigma * N_flow * dt"
+    variables:
+      sigma: sigmoid_output
+      N_flow: nutrient_flow
+      dt: time_delta
+    output: A_voc
+    layer: 1
+    source: "IMG_20260719_144042.jpg"
+
+  - id: F_SHIMMER_DECAY
+    label: Shimmer Decay Curve
+    expr: "A * exp(-lam * t) + p * phi_hysteresis"
+    variables:
+      A: amplitude
+      lam: shimmer_decay_rate
+      t: time_steps
+      p: pressure
+      phi_hysteresis: hysteresis_factor
+    output: shimmer_t
+    layer: X
+    source: "IMG_20260719_144039.jpg"
+
+  - id: F_SHIMMER_BASE
+    label: Shimmer Base
+    expr: "delta_fn(A - TP_RAR_t + eps/2 - decay_coef) + p * phi_hysteresis"
+    variables:
+      A: amplitude
+      TP_RAR_t: tp_rar_at_t
+      eps: epsilon
+      decay_coef: decay_coefficient
+      p: pressure
+      phi_hysteresis: hysteresis_factor
+    output: shimmer_base
+    layer: X
+    source: "IMG_20260719_144039.jpg"
+
+  - id: F_SHI_AGGREGATE
+    label: SHI Aggregate Health
+    expr: "w_V*V + w_M*MPOS_O + w_T*T + w_A*A + w_S*S"
+    variables:
+      w_V: weight_vitality
+      V: vitality
+      w_M: weight_memory_pos
+      MPOS_O: memory_position
+      w_T: weight_temperature
+      T: temperature
+      w_A: weight_activation
+      A: activation
+      w_S: weight_stability
+      S: stability
+    output: SHI
+    layer: X
+    source: "IMG_20260719_144039.jpg"
+
+  - id: F_DECAY_NUTRIENT
+    label: Decay Nutrient
+    expr: "R - Q * dt"
+    variables:
+      R: resource
+      Q: decay_rate
+      dt: time_delta
+    output: P_n
+    layer: 1
+    source: "IMG_20260719_144039.jpg"
+
+  - id: F_PROBABILITY_GAIN
+    label: Probability Gain
+    expr: "I * S * C_score * (1 - p)"
+    variables:
+      I: information_value
+      S: stability
+      C_score: confidence_score
+      p: pressure
+    output: delta_P
+    layer: X
+    source: "IMG_20260719_144039.jpg"
+
+  - id: F_SUCCESS_RATIO
+    label: Final Success Ratio
+    expr: "(lam_n + A) / SR"
+    variables:
+      lam_n: lambda_n
+      A: activation
+      SR: success_rate
+    output: F_success
+    layer: X
+    source: "IMG_20260719_144039.jpg"
+
+  - id: F_CRYSTALLISATION
+    label: Crystallisation Threshold
+    expr: "eta ** t_min * shimmerfield_t0"
+    variables:
+      eta: learning_rate
+      t_min: time_min
+      shimmerfield_t0: shimmer_at_t0
+    output: C_thresh
+    layer: 3
+    source: "IMG_20260719_144039.jpg"
+
+  - id: F_BLOOM_UPDATE
+    label: Semantic Vector Bloom Update
+    expr: "n_i + sum(cos(V_j, n_j) / m_j * o_j for j in B_active)"
+    variables:
+      n_i: semantic_vector_i
+      V_j: bloom_memory_vector_j
+      n_j: semantic_vector_j
+      m_j: bloom_mass_j
+      o_j: bloom_output_j
+      B_active: active_bloom_pool
+    output: n_prime_i
+    layer: 1
+    source: "IMG_20260719_144018.jpg"
+
+  - id: F_SCUP_CANONICAL
+    label: SCUP Canonical (TP-RAR form)
+    expr: "(S_i * TP_RAR) / (1 + P_s + U_p)"
+    variables:
+      S_i: state_index
+      TP_RAR: tp_rar
+      P_s: pressure_score
+      U_p: uncertainty_param
+    output: SCUP
+    layer: 3
+    source: "IMG_20260719_144100.jpg"
+    code:
+      - workers.cairrn.formulas.f_scup_canonical
+      - workers.cairrn.f_scup_canonical
+
+  - id: F_SHI_FULL
+    label: SHI Full (weighted semantic components)
+    expr: "alpha*E_s + beta*V_e + gamma*D_r*delta*abs(1-S_c) + epsilon*(S_out/A_shmol)"
+    variables:
+      alpha: weight_alpha
+      E_s: energy_state
+      beta: weight_beta
+      V_e: volatility_edge
+      gamma: weight_gamma
+      D_r: directional_routing
+      delta: weight_delta
+      S_c: structural_coherence
+      epsilon: weight_epsilon
+      S_out: output_state
+      A_shmol: ash_mol_equivalent
+    output: SHI
+    layer: X
+    source: "IMG_20260719_144100.jpg"
+
+  - id: F_NUTRIENT_DECAY
+    label: Nutrient Decay (recurrence)
+    expr: "N_t * lam"
+    variables:
+      N_t: nutrient_at_t
+      lam: decay_rate
+    output: N_next
+    layer: 1
+    source: "IMG_20260719_144100.jpg"
+
+  - id: F_ASH_YIELD
+    label: Ash Yield (Arrhenius-style)
+    expr: "A_base * exp(k * (T - T_min))"
+    variables:
+      A_base: ash_base_yield
+      k: growth_coefficient
+      T: temperature
+      T_min: temperature_min
+    output: A_yield
+    layer: X
+    source: "IMG_20260719_144100.jpg"
+
+  - id: F_EDGE_VOLATILITY
+    label: Edge Volatility
+    expr: "std(abs_delta_T_edge) + avg(abs(abs_delta_T_edge)) * w"
+    variables:
+      abs_delta_T_edge: edge_temperature_deltas
+      w: weight
+    output: V_edge
+    layer: X
+    source: "IMG_20260719_144100.jpg"
+
+  - id: F_CAIRRN_COMPOSITE_CONDITION
+    label: CAIRRN Composite Threshold Condition
+    expr: "abs(z+x)*abs(1-e) - Ti <= abs(z+x)*abs(y-e) + Ti"
+    variables:
+      z: SCOP
+      x: confidence
+      y: dawn_data
+      e: energy_cost_cairrn
+      Ti: tick_interval
+    output: condition_met
+    layer: X
+    note: "e = energy cost (CAIRRN score), NOT Euler's number"
+    source: "IMG_20260719_144254.jpg"
+
+  - id: F_DELTA_TWO_V2
+    label: Second-Order Delta (CTi form)
+    expr: "abs(D_n + T) / abs(d_CTi) * U / T"
+    variables:
+      D_n: semantic_distance
+      T: time_steps
+      d_CTi: partial_tick_interval
+      U: unity
+    output: delta2
+    layer: 3
+    note: "Replaces F_DELTA_TWO; d_CTi = partial w.r.t. current tick interval #; U = Unity = 1.0"
+    source: "IMG_20260719_144254.jpg"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # BATCH 2 GAP — F_ATTRACTION_TRIMM (missing from prior merge)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: F_ATTRACTION_TRIMM
+    label: Attraction Trimmed (sigma-gated)
+    expr: "A_trimm = sigma(abs(y * beta_g) | abs((z - x) / beta_g)) * beta_g_whi ** 2"
+    vars:
+      y:          scup_coordinate    # float, SCUP y-coordinate
+      beta_g:     beta_gravity       # float, βg (guarded > 0)
+      z:          uncertainty        # float
+      x:          confidence         # float
+      beta_g_whi: beta_gravity_whi   # float, βg_WHI (squared)
+      sigma:      sigmoid_fn         # function reference
+    output: A_trimm                  # trimmed attraction (sigma-gated)
+    layer: 1
+    source: IMG_20260719_144239.jpg
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # VAULT KEEP NOTES — formulas from keep/2025-10-05-034506-monday-formula-sheet-sheet
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: F_SHANNON_EXTENSION
+    label: Shannon Capacity Extension
+    expr: "C = B_psi * log2(1 + unity / (drift + entropy)) + delta_semantic"
+    vars:
+      B_psi:         bandwidth_psi       # float, B^Ψ — bandwidth raised to capacity exponent
+      unity:         unity               # float, unity scalar (typically 1.0)
+      drift:         semantic_drift      # float, current semantic drift
+      entropy:       entropy             # float, system entropy
+      delta_semantic: semantic_delta     # float, Δ_semantic correction term
+    output: C                            # channel capacity (extended Shannon)
+    layer: X
+    source: keep/2025-10-05-034506-monday-formula-sheet-sheet.md
+
+  - id: F_LOAD_COEFFICIENT
+    label: Load Coefficient
+    expr: "Load = C_plus - C_minus"
+    vars:
+      C_plus:  capacity_positive   # float, positive channel capacity
+      C_minus: capacity_negative   # float, negative channel capacity
+    output: Load                   # net cognitive load
+    layer: X
+    source: keep/2025-10-05-034506-monday-formula-sheet-sheet.md
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # VAULT KEEP NOTES — formulas from keep/2025-05-26-141815-semantic-feild-formule
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: F_COSINE_SIMILARITY
+    label: Cosine Similarity
+    expr: "sim(A, B) = dot(A, B) / (norm(A) * norm(B))"
+    vars:
+      A:    vector_a    # vector, first semantic embedding
+      B:    vector_b    # vector, second semantic embedding
+    output: sim         # cosine similarity ∈ [-1, 1]
+    layer: X
+    source: keep/2025-05-26-141815-semantic-feild-formule.md
+
+  - id: F_EDGE_WEIGHT
+    label: Semantic Edge Weight (Reinforcement)
+    expr: "W_edge = sum(sim(A_i, B_i) * reinforcement(A_i, B_i) for i in range(n))"
+    vars:
+      A_i:          subvector_a_i      # vector, component of node A
+      B_i:          subvector_b_i      # vector, component of node B
+      reinforcement: reinforcement_fn  # function, nutrient-flow reinforcement between nodes
+    output: W_edge                     # edge weight between nodes A and B
+    layer: 1
+    source: keep/2025-05-26-141815-semantic-feild-formule.md
+
+  - id: F_PATH_COST
+    label: Hybrid Path Cost (Semantic + Hop)
+    expr: "Path_Cost = Hop_Count * (1 - sim(A, B))"
+    vars:
+      Hop_Count: hop_count     # int, number of edges traversed
+      A:         node_a        # vector, source node embedding
+      B:         node_b        # vector, target node embedding
+    output: Path_Cost          # path traversal cost (lower = better)
+    layer: 2
+    source: keep/2025-05-26-141815-semantic-feild-formule.md
+
+  - id: F_PATH_REINFORCEMENT
+    label: Path Reinforcement Score
+    expr: "P_reinf = sum(nutrient_flow_t for t in range(T)) / T"
+    vars:
+      nutrient_flow_t: nutrient_flow_at_t   # float, nutrient flowing A→B at tick t
+      T:               total_ticks          # int, total ticks accumulated
+    output: P_reinf                         # path reinforcement score (higher = stronger)
+    layer: 1
+    source: keep/2025-05-26-141815-semantic-feild-formule.md
+
+  - id: F_PRESSURE_HEATMAP
+    label: Nutrient Pressure Heatmap
+    expr: "Pressure_A = sum(nutrient_flow_i * weight_i for i in connected_nodes)"
+    vars:
+      nutrient_flow_i: nutrient_flow_i   # float, flow from connected node i
+      weight_i:        edge_weight_i     # float, weight of edge A↔i
+    output: Pressure_A                   # semantic pressure at node A
+    layer: X
+    source: keep/2025-05-26-141815-semantic-feild-formule.md
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # VAULT KEEP NOTES — formulas from keep/2025-12-06-123319-rag-formula
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: F_RAG_PRIORITY
+    label: RAG Semantic Priority Score
+    expr: "P_sps = (X_norm / O_N) - (T_pos / P_risk)"
+    vars:
+      X_norm:  semantic_awareness    # float, RF output ∈ [0,1] — chunk importance
+      O_N:     system_complexity     # float, O(N) — indexing overhead / load
+      T_pos:   positional_context    # float, time-decay / hierarchical depth penalty
+      P_risk:  perplexity_risk       # float, global constant — peripheral content tolerance
+    output: P_sps                    # semantic priority score (ORDER BY, LIMIT n)
+    layer: X
+    note: "Pericles retrieval funnel score. Higher = higher retrieval priority."
+    source: keep/2025-12-06-123319-rag-formula.md
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PHYSICS SCAFFOLD — formulas from dawn-physics-scaffold.md
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: F_PLANCK_TIME
+    label: Planck Time
+    expr: "t_p = sqrt(hbar * G / c**5)"
+    vars:
+      hbar: reduced_planck_constant  # float, ℏ = 1.0546e-34 J·s
+      G:    gravitational_constant   # float, G = 6.674e-11 N·m²/kg²
+      c:    speed_of_light           # float, c = 2.998e8 m/s
+    output: t_p                      # Planck time (hard scale lower bound)
+    layer: X
+    source: dawn-physics-scaffold.md
+
+  - id: F_PLANCK_LENGTH
+    label: Planck Length
+    expr: "l_p = sqrt(hbar * G / c**3)"
+    vars:
+      hbar: reduced_planck_constant
+      G:    gravitational_constant
+      c:    speed_of_light
+    output: l_p
+    layer: X
+    source: dawn-physics-scaffold.md
+
+  - id: F_PLANCK_MASS
+    label: Planck Mass
+    expr: "m_p = sqrt(hbar * c / G)"
+    vars:
+      hbar: reduced_planck_constant
+      c:    speed_of_light
+      G:    gravitational_constant
+    output: m_p
+    layer: X
+    source: dawn-physics-scaffold.md
+
+  - id: F_PLANCK_ENERGY
+    label: Planck Energy
+    expr: "E_p = m_p * c**2"
+    vars:
+      m_p: planck_mass       # float, output of F_PLANCK_MASS
+      c:   speed_of_light    # float
+    output: E_p
+    layer: X
+    source: dawn-physics-scaffold.md
+
+  - id: F_VOICE_EVOLUTION
+    label: Voice Mutation Rate
+    expr: "mu = P * (1 - SHI)"
+    vars:
+      P:   cognitive_pressure       # float, output of F_COGNITIVE_PRESSURE
+      SHI: schema_health_index      # float ∈ [0,1], output of F_SHI_AGGREGATE or F_SHI_FULL
+    output: mu                       # μ — mutation rate (voice sharpness)
+    layer: X
+    note: "Voice sharpens under high pressure; softens with high SHI."
+    source: dawn-physics-scaffold.md
+
+  - id: F_WOLF_REPAIR
+    label: Wolf Repair Protocol (SHI recovery)
+    expr: "delta_SHI_repair = k / error_count"
+    vars:
+      k:           repair_gain    # float, repair gain constant
+      error_count: error_count    # int > 0, accumulated detected errors
+    output: delta_SHI_repair       # ΔSHI — incremental SHI recovery per tick
+    layer: X
+    note: "Trigger: SHI < theta_safe for tau consecutive ticks. Diminishing returns by design."
+    source: dawn-physics-scaffold.md
+
+  - id: F_ENTROPY_LOOP
+    label: Entropy Pulse Loop
+    expr: "delta_S_tick = f(P, SHI)"
+    vars:
+      P:   cognitive_pressure    # float
+      SHI: schema_health_index   # float
+    output: delta_S_tick          # ΔS per tick — must satisfy ΔS ≥ 0
+    layer: X
+    note: "Second-law constraint: delta_S_tick >= 0. Pulse corrections fire when entropy would compound."
+    source: dawn-physics-scaffold.md
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MATH NODE — formulas from MATH.md / sims/ana_chi.py
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: F_NEG_EXP
+    label: Neg-Exp Sharding Map
+    expr: "neg_exp(x) = -exp(x)"
+    vars:
+      x: input   # float, shard input value
+    output: neg_exp_x   # float, neg-exp mapped value (always ≤ 0)
+    layer: 2
+    note: "d/dx(−eˣ) = −eˣ — no stable fixed point in R+. Used for shard routing in CAIRRN Layer 2."
+    source: MATH.md
+
+  - id: F_DOUBLE_WELL
+    label: Double-Well Potential
+    expr: "V(x) = (x**2 - alpha**2)**2"
+    vars:
+      x:     position   # float, state coordinate
+      alpha: alpha       # float, α = 1.96 — attractor basin radius
+    output: V            # potential energy — minima at x = ±α
+    layer: 1
+    note: "V'(x) = 4x(x²-α²). Fixed points: x=0 (unstable), x=±α (stable, V''=8α²>0). α=1.96."
+    source: MATH.md
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # LIVE IMPLEMENTATIONS — formulas that exist in Python but were missing
+  # from the 2026-07-21 catalog. Canonised 2026-08-20.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - id: F_CSS
+    label: Coherence State Score
+    expr: "CSS = A_nw · Δ · |Cc · (z_prev/z)| · |Tcv · SCOP / (e2 − H2)| · |Δ − E5| / |1 − E1|"
+    variables:
+      A_nw:    resources              # float, n_w weighted; proxy 1.0
+      delta:   change_signal          # float, Δ since last tick
+      Cc:      consumption            # float, energy cost proxy
+      z_prev:  scop_z_prev            # float
+      z:       scop_z                 # float, guarded ≠ 0
+      Tcv:     tracer_consensus_value # float
+      SCOP:    scope_coordinate       # float
+      e2:      energy_math_basin      # float, proxy ≈ 3.92 (2·α)
+      H2:      height_squared         # float
+      e5:      energy_commands_basin  # float, proxy ≈ 11.76 (6·α)
+      e1:      energy_code_basin      # float
+    output: CSS
+    layer: 3
+    value_system: harmonic_ring
+    source: workers/cairrn/formulas.py
+
+  - id: F_M3
+    label: Prefeed Quality Composite
+    expr: "M3 = |CSS| · n · |FastFormula − SHI|"
+    variables:
+      CSS:          coherence_state_score
+      n:            track_count            # int, clamped ≥ 1
+      FastFormula:  mean_pfs_resonance     # float
+      SHI:          schema_health_index    # float, mean shard activation
+    output: M3                             # low → accept shuffle; high → discard
+    layer: 3
+    value_system: harmonic_ring
+    source: workers/cairrn/formulas.py
+
+  - id: F_CC
+    label: Transformation Energy Budget
+    expr: "Cc = ((c − A) / p) · Tcv"
+    variables:
+      c:   capacity_ceiling          # float, system energy ceiling
+      A:   adaptive_capacity         # float, F_ADAPTIVE_CAPACITY output
+      p:   pressure                  # float, guarded ≠ 0
+      Tcv: tracer_consensus_value    # float [0, 1]
+    output: Cc
+    layer: X
+    value_system: e5_gate
+    source: workers/cairrn/formulas.py
+    code:
+      - workers.cairrn.formulas.f_cc_energy_budget
+      - workers.cairrn.f_cc_energy_budget
+      - phi.core.ranker.cc_budget_score
+
+  - id: F_K_SIGIL
+    label: Sigil-Layer Transformation Score
+    expr: "k = (H + Cc) − G"
+    variables:
+      H:  height_node                # F_HEIGHT_NODE
+      Cc: energy_budget              # F_CC
+      G:  global_rzone               # F_GLOBAL_RZONE
+    output: k                        # k > 0 viable; k < 0 blocked
+    layer: X
+    value_system: e5_gate
+    source: workers/cairrn/formulas.py
+
+  - id: F_E5
+    label: Transformation Readiness Metric
+    expr: "e5 = tanh( (H + K) / (G − energy_dot) − Bc / bc_max )"
+    variables:
+      H:          height_node
+      K:          hub_kinetic_injection
+      G:          global_rzone
+      energy_dot: rhizome_scop_energy_dot   # r·En_rhizome + y·En_scop
+      Bc:         queue_depth               # int
+      bc_max:     queue_saturation          # int, default 20
+    output: e5                              # ∈ (−1, 1)
+    layer: X
+    value_system: e5_gate
+    source: workers/cairrn/formulas.py
+
+  - id: F_E4
+    label: Node Readiness / Locality Gate
+    expr: "e4 = |e5 / (−z)| + Cc − 1"
+    variables:
+      e5: transformation_readiness   # F_E5 output
+      z:  scop_coordinate            # spatial coherence cost, guarded ≠ 0
+      Cc: energy_budget              # F_CC
+    output: e4                       # e4 > 0 → track emits
+    layer: Z
+    value_system: e5_gate
+    source: workers/cairrn/formulas.py
+
+  - id: F_E5_LOAD_LINE
+    label: Song-Stack Load Line
+    expr: "V/R_min = arctanh(0.1) + Bc / bc_max"
+    variables:
+      Bc:     queue_depth
+      bc_max: queue_saturation       # default 20
+    output: VR_min                   # minimum drive-to-resistance to OPEN
+    layer: X
+    value_system: e5_gate
+    source: workers/cairrn/formulas.py
+
+  - id: F_ENVELOPE_MAX
+    label: Routing Cost Envelope Upper Bound
+    expr: "A_xmax = A^w · |z − 2c/K| · v · |i·v + 1| · βt"
+    variables:
+      A: resources                   # proxy 1.0
+      w: resource_exponent           # proxy 1.0
+      z: z_awareness
+      c: consumption                 # proxy = modulated
+      K: tracer_consensus_delta      # proxy 1.0, guarded ≠ 0
+      v: velocity                    # |metric_raw − modulated|
+      i: shard_index                 # int [0, 7]
+      beta_t: pressure_at_t
+    output: A_xmax                   # clip modulated to min(modulated, A_xmax)
+    layer: X
+    value_system: cairrn_layers
+    source: workers/cairrn/formulas.py
+
+  - id: F_ENVELOPE_MIN
+    label: Routing Cost Envelope Lower Bound
+    expr: "A_xmin = k · |r·g| · |z − x/βt| − βH"
+    variables:
+      k:      repair_gain            # proxy COHERENCE_FLOOR 0.5
+      r:      rizomic_coordinate     # shard / (N−1) ∈ [0, 1]
+      g:      global_friction        # proxy LOCAL_FRICTION 0.5
+      z:      z_awareness
+      x:      modulated
+      beta_t: coherence              # guarded ≠ 0
+      beta_h: height_pressure        # proxy COHERENCE_FLOOR 0.5
+    output: A_xmin                   # effective floor = max(0, A_xmin)
+    layer: X
+    value_system: cairrn_layers
+    source: workers/cairrn/formulas.py
+
+  - id: F_COMPOSITE_HEALTH_HORIZON
+    label: Composite Health Horizon
+    expr: "Ti* = A / (B − 1)  if B > 1  else  ∞     A = |z+x|·|1−e|    B = N·|2+x|·|g−e|"
+    variables:
+      z:         z_awareness
+      x:         modulated
+      e:         energy              # target = 1.0
+      g:         global_friction
+      n_windows: tick_windows        # int N
+      ti:        tick_interval       # context only
+    output: Ti_star                  # max tick interval before Ψ′ goes negative
+    layer: X
+    value_system: cairrn_layers
+    source: workers/cairrn/formulas.py
+
+  - id: F_ENERGY_WEIGHTED_GEOM
+    label: Geometric Weighted Energy
+    expr: "EW_geom = Σ |x_i − z_i| · A^(2w−1) / (T_i · n_w)"
+    variables:
+      x_i: energy_i
+      z_i: desirability_cost_i
+      A:   resources
+      w:   resource_philosophy       # [0, 1], default 0.5
+      T_i: dist_weighted_time_i
+      n_w: positive_normalisation
+    output: EW_geom
+    layer: 1
+    value_system: cairrn_layers
+    source: workers/cairrn/formulas.py
+
+  - id: F_JULES_NORM
+    label: Jules Millijoule Normalisation
+    expr: "j' = J_q − min(J_q)     J_q = round(J, 3)"
+    variables:
+      J:   jules_raw                 # energy / entropy, any real ≥ 0
+    output: j_prime                  # millijoule precision; 0.00 baseline taken out
+    layer: X
+    value_system: dawn_confidence
+    note: >
+      Jules taken to 0.001 (millijoule), then normalised with the 0.00
+      floor subtracted so the most-focused reading sits at exactly 0.00.
+    source: operator (2026-08-20)
+
+  - id: F_DAWN_CONFIDENCE
+    label: DAWN Confidence
+    expr: "x = |k · j'| ∨ D"
+    variables:
+      k:       neuro_activation      # dawn neuro activation K
+      j_prime: jules_normalised      # F_JULES_NORM output
+      D:       drift_delta_vector    # hot-swappable drift implementation
+    output: x                        # DAWN confidence — superposition cloud, not a pinpoint
+    layer: X
+    value_system: dawn_confidence
+    note: >
+      ∨ is max / logical-OR over magnitudes. D is a delta vector whose
+      drift formula is hot-swappable (iwave, semantic, embedding, mycelial).
+      Nested into Pericles as the denominator, and into the r1–r6 stack as x_i.
+      Imaginary / superposition value — the cloud of where DAWN could be,
+      not the measured confidence.
+    source: operator (2026-08-20); keep/2026-03-24-234438
+
+  - id: F_PERICLES
+    label: Pericles Exact-Retrieval Score
+    expr: "per = |tc_A − Adp_At| · k / x     x = F_DAWN_CONFIDENCE"
+    variables:
+      tc_A:    tag_coherence_A
+      Adp_At:  adaptive_attractor
+      k:       combined_score
+      x:       dawn_confidence       # F_DAWN_CONFIDENCE
+    output: per
+    layer: X
+    value_system: pericles
+    source: psspps/find.py
+
+  - id: F_HARMONIC_PROPAGATE
+    label: Local Harmonic Diffusion
+    expr: "a_i(t+1) = a_i(t) + κ · [a_{i−1}(t) + a_{i+1}(t) − 2·a_i(t)]"
+    variables:
+      a_i:   shard_activation
+      kappa: coupling                # default 0.15, domain (0, 0.5)
+    output: a_i_next
+    layer: 2
+    value_system: harmonic_ring
+    source: sims/harmonic.py
+
+  - id: F_RESONANCE_PROPAGATE
+    label: Resonance-Sharing Propagator
+    expr: "w_i = exp( (−cos(π · a_p/A)) · (−cos(π · d_i)) )     hotspot donates κ·a_p"
+    variables:
+      a_p:   peak_activation
+      A:     total_activation
+      d_i:   ring_distance           # min(|i−p|, N−|i−p|) / (N/2) ∈ [0, 1]
+      kappa: coupling                # default 0.15, domain (0, 1)
+    output: a_redistributed          # total activation conserved
+    layer: 2
+    value_system: harmonic_ring
+    source: sims/harmonic.py
+
+  - id: F_GRADIENT_DESCENT
+    label: Double-Well Gradient Descent
+    expr: "x_{n+1} = x_n − lr · V′(x_n)     V′(x) = 4x(x² − α²)"
+    variables:
+      x:     position
+      lr:    learning_rate           # default 0.05
+      alpha: alpha                   # 1.96
+    output: x_next                   # converges to +α if x0>0, −α if x0<0
+    layer: 1
+    value_system: double_well
+    source: sims/attractors.py
+
+  - id: F_LANGEVIN
+    label: Overdamped Langevin Update
+    expr: "x_{n+1} = x_n − lr · V′(x_n) + √(2·D·lr) · ξ     ξ ~ N(0,1)"
+    variables:
+      x:           position
+      lr:          learning_rate
+      D:           diffusion         # noise_scale²
+      noise_scale: sigma
+    output: x_next
+    layer: 1
+    value_system: double_well
+    source: mfpt.md
+
+  - id: F_KRAMERS
+    label: Overdamped Kramers Escape Rate
+    expr: "λ = (ω₀ · ω_s) / 2π · exp(−ΔV / D)"
+    variables:
+      omega_0: well_frequency        # 2√2·α = 5.5436
+      omega_s: saddle_frequency      # 2α = 3.92
+      delta_V: barrier_height        # α⁴ = 14.7579
+      D:       diffusion             # noise_scale²
+    output: lambda_escape
+    layer: 1
+    value_system: double_well
+    source: mfpt.md
+
+  - id: F_MFPT
+    label: Mean First Passage Time
+    expr: "τ = 1/λ     τ_steps = τ / lr"
+    variables:
+      lambda_escape: kramers_rate
+      lr:            learning_rate
+    output: tau
+    layer: 1
+    value_system: double_well
+    source: mfpt.md
+
+  - id: F_LAMBERT_W
+    label: Lambert-W Fixed Point of −eˣ
+    expr: "x* = −W(1)     −e^{x*} = x*"
+    variables:
+      W_1: lambert_w_of_1            # 0.5671432904097838
+    output: x_star                   # −0.5671432904097838
+    layer: 2
+    value_system: physics
+    source: lambert-w.md
+
+  - id: F_MYCELIAL_DEMAND
+    label: Mycelial Node Demand
+    expr: "D_i = wP·P_i + wΔ·drift_align_i + wR·recency_i − wσ·σ_i"
+    variables:
+      P_i:          pressure
+      drift_align:  drift_alignment  # [−1, 1]
+      recency:      recency          # [0, 1]
+      entropy:      sigma_i
+      wP:           w_pressure       # 0.40
+      wDelta:       w_drift          # 0.25
+      wR:           w_recency        # 0.20
+      wSigma:       w_entropy        # 0.15
+    output: D_i
+    layer: 1
+    value_system: mycelial
+    source: workers/cairrn/mycelial.py
+
+  - id: F_CONDUCTANCE
+    label: Mycelial Edge Conductance
+    expr: "g_ij = σ(κ · w_ij)     σ = 1 / (1 + e^{−x})"
+    variables:
+      w_ij:  edge_weight
+      kappa: coupling                # 0.15
+    output: g_ij                     # ∈ (0, 1)
+    layer: 1
+    value_system: mycelial
+    source: workers/cairrn/mycelial.py
+
+  - id: F_METABOLISE
+    label: Nutrient-to-Energy Conversion
+    expr: "E = clamp(η · nutrients − basal_cost, 0, E_max)"
+    variables:
+      nutrients:  allocated_nutrients
+      eta:        conversion_rate    # 0.80
+      basal_cost: basal_cost         # 0.02
+      E_max:      energy_ceiling     # 1.00
+    output: E
+    layer: 1
+    value_system: mycelial
+    source: workers/cairrn/mycelial.py

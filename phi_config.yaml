@@ -1,0 +1,36 @@
+# phi_config.yaml — phi music player configuration
+# This file is NOT committed to git (contains API keys).
+# Copy phi_config.example.yaml and fill in your values.
+
+# ── MusicBrainz + AcoustID fingerprinting ─────────────────────────────────────
+meta_enrichment:
+  acoustid_api_key: "g4YLqEflSn"
+  mb_user_agent: "phi/0.3.0 (phi@local)"
+  confidence_threshold: 0.70    # auto-accept above this, queue below
+  write_back_enabled: true      # write enriched tags back to audio files
+  inter_track_seconds: 1.0      # sleep between tracks (be polite to APIs)
+  pause_during_playback: true   # pause enrichment while audio is playing
+  enrich_online: false          # set true to enable Spotify/Discogs/Deezer/Last.fm/Lyrics during playback
+  # Last.fm read API key (same key works for both reading and scrobbling)
+  # Get a free key at https://www.last.fm/api/account/create
+  lastfm_api_key: ""            # e.g. "abc123def456..."
+
+# ── Spotify audio features ────────────────────────────────────────────────────
+# Provides: energy, valence, danceability, tempo, key, mode, acousticness,
+# instrumentalness, liveness, speechiness, loudness.
+# These feed directly into the ranker's mood + energy affinity calculations.
+# Get free credentials at https://developer.spotify.com/dashboard
+spotify:
+  client_id:     "dc91db1a3b1a412db07aedc746a9a3e0"
+  client_secret: "cdeae67298aa45a8b9217593f701cf7e"
+  # OAuth redirect URI — must be registered in your Spotify app dashboard:
+  #   developer.spotify.com/dashboard → your app → Edit → Redirect URIs
+  # Also register http://localhost:8889/callback as a fallback if 8888 is busy.
+  redirect_uri:  "http://localhost:8888/callback"
+
+# ── Discogs release metadata ───────────────────────────────────────────────────
+# Provides: pressing format, country, community have/want counts, styles,
+# production credits (producer, mastering engineer, mixer, etc.).
+# Get a personal access token at https://www.discogs.com/settings/developers
+discogs:
+  token: "JEkLtsTnAazJHVzRJNAHjuohIeMrYWHCDLTdfJgR"

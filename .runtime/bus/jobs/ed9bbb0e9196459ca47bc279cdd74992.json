@@ -1,0 +1,1 @@
+{"job_id": "ed9bbb0e9196459ca47bc279cdd74992", "task": "search.psspps", "kwargs": {"query": "recent session activity vault context agent comment", "activations": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "top_k": 5, "perspective_alpha": 0.5, "modulation": null}, "status": "queued", "queued_at": 1787355095.801058}

@@ -1,0 +1,1 @@
+{"job_id": "2e076676a1eb4927a7acab82954da897", "task": "search.psspps", "kwargs": {"query": "session history project overview agent context workflow protocol", "activations": [0.7, 0.15, 0.0, 0.0, 0.0, 0.0, 0.0, 0.15], "top_k": 5, "perspective_alpha": 0.6062363669231025, "modulation": null}, "status": "queued", "queued_at": 1787380149.6532118}

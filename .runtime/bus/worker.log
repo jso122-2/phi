@@ -1,0 +1,376 @@
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+ 
+ -------------- spotify-rip-bus@Jacks-MacBook-Neo.local v5.6.3 (recovery)
+--- ***** ----- 
+-- ******* ---- macOS-26.5.2-arm64-arm-64bit 2026-08-21 17:22:12
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         spotify_rip_bus:0x105346e90
+- ** ---------- .> transport:   filesystem://localhost//
+- ** ---------- .> results:     file:///Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/celery/results
+- *** --- * --- .> concurrency: 1 (solo)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . graph.commit
+  . graph.ingest
+  . graph.ingest_source
+  . graph.link
+  . graph.topo_hubs
+  . graph.traverse
+  . search.find
+  . search.psspps
+  . studio.build
+  . warmup.corpus
+  . warmup.phi
+
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+[bus-worker] INFO celery.worker.consumer.connection: Connected to filesystem://localhost//
+[bus-worker] INFO celery.apps.worker: spotify-rip-bus@Jacks-MacBook-Neo.local ready.
+
+worker: Warm shutdown (MainProcess)
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+ 
+ -------------- spotify-rip-bus@Jacks-MacBook-Neo.local v5.6.3 (recovery)
+--- ***** ----- 
+-- ******* ---- macOS-26.5.2-arm64-arm-64bit 2026-08-21 17:49:30
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         spotify_rip_bus:0x114e2c090
+- ** ---------- .> transport:   filesystem://localhost//
+- ** ---------- .> results:     file:///Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/celery/results
+- *** --- * --- .> concurrency: 1 (solo)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . graph.annotate
+  . graph.commit
+  . graph.ingest
+  . graph.ingest_source
+  . graph.link
+  . graph.topo_hubs
+  . graph.traverse
+  . search.find
+  . search.psspps
+  . studio.build
+  . warmup.corpus
+  . warmup.phi
+
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+[bus-worker] INFO celery.worker.consumer.connection: Connected to filesystem://localhost//
+[bus-worker] INFO celery.apps.worker: spotify-rip-bus@Jacks-MacBook-Neo.local ready.
+
+worker: Warm shutdown (MainProcess)
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+ 
+ -------------- spotify-rip-bus@Jacks-MacBook-Neo.local v5.6.3 (recovery)
+--- ***** ----- 
+-- ******* ---- macOS-26.5.2-arm64-arm-64bit 2026-08-22 06:10:34
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         spotify_rip_bus:0x105d7a1d0
+- ** ---------- .> transport:   filesystem://localhost//
+- ** ---------- .> results:     file:///Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/celery/results
+- *** --- * --- .> concurrency: 1 (solo)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . graph.annotate
+  . graph.commit
+  . graph.ingest
+  . graph.ingest_source
+  . graph.link
+  . graph.topo_hubs
+  . graph.traverse
+  . search.find
+  . search.psspps
+  . studio.build
+  . warmup.corpus
+  . warmup.phi
+
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+[bus-worker] INFO celery.worker.consumer.connection: Connected to filesystem://localhost//
+[bus-worker] INFO celery.apps.worker: spotify-rip-bus@Jacks-MacBook-Neo.local ready.
+
+worker: Warm shutdown (MainProcess)
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+ 
+ -------------- spotify-rip-bus@Jacks-MacBook-Neo.local v5.6.3 (recovery)
+--- ***** ----- 
+-- ******* ---- macOS-26.5.2-arm64-arm-64bit 2026-08-22 06:10:51
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         spotify_rip_bus:0x1287237d0
+- ** ---------- .> transport:   filesystem://localhost//
+- ** ---------- .> results:     file:///Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/celery/results
+- *** --- * --- .> concurrency: 1 (solo)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . graph.annotate
+  . graph.commit
+  . graph.ingest
+  . graph.ingest_source
+  . graph.link
+  . graph.topo_hubs
+  . graph.traverse
+  . search.find
+  . search.psspps
+  . studio.build
+  . warmup.corpus
+  . warmup.phi
+
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+[bus-worker] INFO celery.worker.consumer.connection: Connected to filesystem://localhost//
+[bus-worker] INFO celery.apps.worker: spotify-rip-bus@Jacks-MacBook-Neo.local ready.
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+ 
+ -------------- spotify-rip-bus@Jacks-MacBook-Neo.local v5.6.3 (recovery)
+--- ***** ----- 
+-- ******* ---- macOS-26.5.2-arm64-arm-64bit 2026-08-22 09:10:44
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         spotify_rip_bus:0x10b9f0350
+- ** ---------- .> transport:   filesystem://localhost//
+- ** ---------- .> results:     file:///Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/celery/results
+- *** --- * --- .> concurrency: 1 (solo)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . graph.annotate
+  . graph.commit
+  . graph.ingest
+  . graph.ingest_source
+  . graph.link
+  . graph.topo_hubs
+  . graph.traverse
+  . search.find
+  . search.psspps
+  . studio.build
+  . warmup.corpus
+  . warmup.phi
+
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+[bus-worker] INFO celery.worker.consumer.connection: Connected to filesystem://localhost//
+[bus-worker] INFO celery.apps.worker: spotify-rip-bus@Jacks-MacBook-Neo.local ready.
+
+worker: Warm shutdown (MainProcess)
+
+worker: Warm shutdown (MainProcess)
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+ 
+ -------------- spotify-rip-bus@Jacks-MacBook-Neo.local v5.6.3 (recovery)
+--- ***** ----- 
+-- ******* ---- macOS-26.5.2-arm64-arm-64bit 2026-08-22 13:05:44
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         spotify_rip_bus:0x1197472d0
+- ** ---------- .> transport:   filesystem://localhost//
+- ** ---------- .> results:     file:///Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/celery/results
+- *** --- * --- .> concurrency: 1 (solo)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . graph.annotate
+  . graph.commit
+  . graph.ingest
+  . graph.ingest_source
+  . graph.link
+  . graph.topo_hubs
+  . graph.traverse
+  . search.find
+  . search.psspps
+  . studio.build
+  . warmup.corpus
+  . warmup.phi
+
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+[bus-worker] INFO celery.worker.consumer.connection: Connected to filesystem://localhost//
+[bus-worker] INFO celery.apps.worker: spotify-rip-bus@Jacks-MacBook-Neo.local ready.
+
+worker: Warm shutdown (MainProcess)
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+ 
+ -------------- spotify-rip-bus@Jacks-MacBook-Neo.local v5.6.3 (recovery)
+--- ***** ----- 
+-- ******* ---- macOS-26.5.2-arm64-arm-64bit 2026-08-22 13:08:40
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         spotify_rip_bus:0x12c147150
+- ** ---------- .> transport:   filesystem://localhost//
+- ** ---------- .> results:     file:///Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/celery/results
+- *** --- * --- .> concurrency: 1 (solo)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . graph.annotate
+  . graph.commit
+  . graph.ingest
+  . graph.ingest_source
+  . graph.link
+  . graph.topo_hubs
+  . graph.traverse
+  . search.find
+  . search.psspps
+  . studio.build
+  . warmup.corpus
+  . warmup.phi
+
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+[bus-worker] INFO celery.worker.consumer.connection: Connected to filesystem://localhost//
+[bus-worker] INFO celery.apps.worker: spotify-rip-bus@Jacks-MacBook-Neo.local ready.
+
+worker: Warm shutdown (MainProcess)
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+ 
+ -------------- spotify-rip-bus@Jacks-MacBook-Neo.local v5.6.3 (recovery)
+--- ***** ----- 
+-- ******* ---- macOS-26.5.2-arm64-arm-64bit 2026-08-22 17:04:38
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         spotify_rip_bus:0x1082d52d0
+- ** ---------- .> transport:   filesystem://localhost//
+- ** ---------- .> results:     file:///Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/celery/results
+- *** --- * --- .> concurrency: 1 (solo)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . graph.annotate
+  . graph.commit
+  . graph.ingest
+  . graph.ingest_source
+  . graph.link
+  . graph.topo_hubs
+  . graph.traverse
+  . search.find
+  . search.psspps
+  . studio.build
+  . warmup.corpus
+  . warmup.phi
+
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+[bus-worker] INFO celery.worker.consumer.connection: Connected to filesystem://localhost//
+[bus-worker] INFO celery.apps.worker: spotify-rip-bus@Jacks-MacBook-Neo.local ready.
+
+worker: Warm shutdown (MainProcess)
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+ 
+ -------------- spotify-rip-bus@Jacks-MacBook-Neo.local v5.6.3 (recovery)
+--- ***** ----- 
+-- ******* ---- macOS-26.5.2-arm64-arm-64bit 2026-08-23 08:42:05
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         spotify_rip_bus:0x1060f9d10
+- ** ---------- .> transport:   filesystem://localhost//
+- ** ---------- .> results:     file:///Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/celery/results
+- *** --- * --- .> concurrency: 1 (solo)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . graph.annotate
+  . graph.commit
+  . graph.ingest
+  . graph.ingest_source
+  . graph.link
+  . graph.topo_hubs
+  . graph.traverse
+  . search.find
+  . search.psspps
+  . studio.build
+  . warmup.corpus
+  . warmup.phi
+
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+[bus-worker] INFO celery.worker.consumer.connection: Connected to filesystem://localhost//
+[bus-worker] INFO celery.apps.worker: spotify-rip-bus@Jacks-MacBook-Neo.local ready.
+
+worker: Warm shutdown (MainProcess)
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/dispatch.ring
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+ 
+ -------------- spotify-rip-bus@Jacks-MacBook-Neo.local v5.6.3 (recovery)
+--- ***** ----- 
+-- ******* ---- macOS-26.5.2-arm64-arm-64bit 2026-08-23 11:40:50
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         spotify_rip_bus:0x114134f10
+- ** ---------- .> transport:   filesystem://localhost//
+- ** ---------- .> results:     file:///Users/a0/Documents/misc/Spotify-Rip/Spotify-rip/.runtime/bus/celery/results
+- *** --- * --- .> concurrency: 1 (solo)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . graph.annotate
+  . graph.commit
+  . graph.ingest
+  . graph.ingest_source
+  . graph.link
+  . graph.topo_hubs
+  . graph.traverse
+  . search.find
+  . search.psspps
+  . studio.build
+  . warmup.corpus
+  . warmup.phi
+
+[bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
+[bus-worker] INFO celery.worker.consumer.connection: Connected to filesystem://localhost//
+[bus-worker] INFO celery.apps.worker: spotify-rip-bus@Jacks-MacBook-Neo.local ready.

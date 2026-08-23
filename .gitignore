@@ -1,0 +1,76 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.env
+.venv
+venv/
+ENV/
+
+# Test & coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Type checking
+.mypy_cache/
+
+# Embedding / MiniLM cache (rebuilt locally)
+.cache/
+
+# Nested Cursor dir — workspace rules live at repo-root .cursor/
+.cursor/
+
+# Runtime mycelial / tracer logs (rewritten every tick)
+agent-log/*.txt
+
+# Harmonic index snapshot (runtime state, restored on server start)
+Spotify-rip/.harmonic-snapshot.json
+
+# Model outputs & checkpoints
+*.pt
+*.ckpt
+*.pth
+*.safetensors
+*.npy
+outputs/
+runs/
+wandb/
+models/cluster_out/
+engine/state/
+
+# Media files
+*.mp4
+*.mp3
+*.mov
+
+# Hold files
+*.hold
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editor / IDE
+.idea/
+*.swp
+*.swo
+
+# Temp / scratch
+tmp_*.py
+scratch_*.py
+
+# macOS app bundle (machine-specific paths — regenerate with scripts/build_phi_app.sh)
+phi.app/

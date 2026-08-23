@@ -1,0 +1,1 @@
+{"job_id": "cb9980b6f78b49068e8846e2dbf0ac8f", "task": "search.psspps", "kwargs": {"query": "PSSPPS retrieval hook test", "activations": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "top_k": 2, "perspective_alpha": 0.5}, "status": "queued", "queued_at": 1787298501.771158}
