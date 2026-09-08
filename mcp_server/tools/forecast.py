@@ -6,7 +6,6 @@ from typing import Any
 from mcp_server._state import _dom_queue, _get_forecasting_engine, _vault_hub, mcp
 
 
-@mcp.tool()
 def forecast_state() -> dict[str, Any]:
     """
     Compute the current DAWN Forecast Index from the live harmonic activation state.

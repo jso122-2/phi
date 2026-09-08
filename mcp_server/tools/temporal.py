@@ -47,7 +47,6 @@ def temporal_coherence() -> dict[str, Any]:
         return _temporal_index.ana_chi_state()
 
 
-@mcp.tool()
 @requires_init
 def temporal_record(hub_name: str, value: float = 1.0) -> dict[str, Any]:
     """
@@ -67,7 +66,6 @@ def temporal_record(hub_name: str, value: float = 1.0) -> dict[str, Any]:
         return {"recorded": True, "hub": hub_name, "value": value, **state}
 
 
-@mcp.tool()
 @requires_init
 def temporal_advance(steps: int = 1) -> dict[str, Any]:
     """
@@ -88,7 +86,6 @@ def temporal_advance(steps: int = 1) -> dict[str, Any]:
         return {"advanced": True, "steps": steps, "clock": new_clock, **state}
 
 
-@mcp.tool()
 @requires_init
 def temporal_reset() -> dict[str, Any]:
     """Reset the temporal index — zero all activations and reset clock to 0."""

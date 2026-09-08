@@ -271,7 +271,6 @@ def run_tests(mode: str = "all", coverage: bool = False) -> dict[str, Any]:
         }
 
 
-@mcp.tool()
 def dom_queue_state() -> dict[str, Any]:
     """Inspect the DOM Request Queue — all 7 houses, call counts, and active state."""
     # Late import: reflects any _reinit_dom_queue() that ran after module load.
@@ -310,14 +309,12 @@ def coherence_state(tail: int = 10) -> dict[str, Any]:
     return data
 
 
-@mcp.tool()
 def list_hooks() -> dict[str, Any]:
     """Return the current state of the append-only pre-tool hook chain."""
     with _dom_queue.gate("list_hooks"):
         return _hook_registry.state()
 
 
-@mcp.tool()
 def register_hook(name: str, description: str) -> dict[str, Any]:
     """
     Register a named placeholder hook in the append-only hook chain.
@@ -341,7 +338,6 @@ def register_hook(name: str, description: str) -> dict[str, Any]:
         }
 
 
-@mcp.tool()
 @requires_init
 def watchdog_state() -> dict[str, Any]:
     """

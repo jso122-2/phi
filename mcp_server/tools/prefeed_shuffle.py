@@ -59,7 +59,6 @@ def _get_shuffle() -> Optional[Any]:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool()
 @requires_init
 def shuffle_seed() -> dict[str, Any]:
     """
