@@ -1,4 +1,23 @@
-"""CAIRRN tools: hub geometry, single-hub run, batch run, CSS/M3 quality gate."""
+"""CAIRRN tools: hub geometry, single-hub run, batch run, CSS/M3 quality gate.
+
+Notion Reservoir integration (CAIRRN-native)
+--------------------------------------------
+Every completed `cairrn_hub_run` fires an async `notion.tick` for the
+**effective** hub (post Layer-3 coherence re-route).  `cairrn_batch_run`
+fires one tick per hub — all of which land in the bus jobs directory as
+queued `notion.tick` jobs, where the in-transit batcher absorbs them into
+a single Notion fetch-increment-write.
+
+The tick note carries:  ``cairrn:<hub>  m=<metric>  coh=<coherence>``
+so the Notion Reservoir edge graph becomes a complete session-level record
+of which CAIRRN hubs fired, at what coherence, for how long.
+
+PSSPPS ticks and CAIRRN ticks coexist: PSSPPS writes dawn/recursive/novel
+shards from retrieval affinity; CAIRRN writes the exact hub shard that the
+four-layer pipeline resolved to.  Together they paint both the epistemic
+(what the agent retrieved) and the computational (which hub processed it)
+faces of each session onto the Reservoir.
+"""
 from __future__ import annotations
 
 from typing import Any
@@ -47,6 +66,36 @@ _CSS_MIDDLE_SHARDS  = (1, 2, 3, 4, 5, 6)
 
 # K coupling constant — matches harmonic propagation κ (keeps injection damped)
 _K_COUPLING: float = 0.15
+
+
+def _cairrn_notion_tick(
+    effective_hub: str,
+    metric: float,
+    coherence: float,
+    note_prefix: str = "cairrn",
+) -> None:
+    """
+    Fire an async Notion Reservoir tick for a completed CAIRRN pipeline run.
+
+    Translates *effective_hub* (the post-Layer-3 coherence-resolved hub) to
+    its Notion shard name via ``psspps.hub_router.hub_to_notion_shard``, then
+    submits a ``notion.tick`` bus job.  Fire-and-forget — silent on any bus,
+    token, or routing failure so a missing bus worker never blocks tool calls.
+
+    The note format ``cairrn:<hub>  m=<metric>  coh=<coherence>`` lets the
+    Notion Reservoir distinguish CAIRRN-originated edges from PSSPPS-originated
+    ones and from manual ticks, making the edge graph fully provenance-aware.
+    """
+    try:
+        from psspps.hub_router import hub_to_notion_shard
+        from mcp_server.bus.side_effects import _notion_tick_async
+        shard = hub_to_notion_shard(effective_hub)
+        if shard is None:
+            return
+        note = f"{note_prefix}:{effective_hub}  m={metric:.3f}  coh={coherence:.4f}"
+        _notion_tick_async([shard], note=note)
+    except Exception:
+        pass
 
 
 def _k_inject(
@@ -200,6 +249,14 @@ def cairrn_hub_run(
         # propagate=False: propagation already ran above.
         k_meta = _k_inject(cairrn.coherence.coherence, hub_name=effective_hub, propagate=False)
 
+        # Notion Reservoir tick — CAIRRN-native stateful identity.
+        # Fires async via singleton bus; in-transit batcher absorbs sibling ticks.
+        _cairrn_notion_tick(
+            effective_hub,
+            metric=cairrn.modulation.modulated_metric,
+            coherence=cairrn.coherence.coherence,
+        )
+
         _vault_hub.push_harmonic(idx_state)
 
         result = cairrn.to_dict()
@@ -292,6 +349,8 @@ def cairrn_batch_run(
 
         # Collect per-hub coherence values for the batch write-back.
         _batch_coherences: list[float] = []
+        # Also collect (effective_hub, mod_val, coherence) for Notion ticks.
+        _notion_ticks: list[tuple[str, float, float]] = []
 
         for _orig_hub, wr in worker_results.items():
             if wr.value and isinstance(wr.value, dict):
@@ -303,9 +362,14 @@ def cairrn_batch_run(
                     _temporal_index.record(effective, value=mod_val)
                 coh_val = cairrn_dict.get("coherence", {})
                 if isinstance(coh_val, dict):
-                    _batch_coherences.append(float(coh_val.get("coherence", 0.5)))
+                    coh_float = float(coh_val.get("coherence", 0.5))
+                    _batch_coherences.append(coh_float)
                 elif isinstance(coh_val, (int, float)):
-                    _batch_coherences.append(float(coh_val))
+                    coh_float = float(coh_val)
+                    _batch_coherences.append(coh_float)
+                else:
+                    coh_float = 0.5
+                _notion_ticks.append((effective, mod_val, coh_float))
 
         # Write back mean coherence across all hubs as the adaptive confidence.
         if _batch_coherences:
@@ -319,6 +383,19 @@ def cairrn_batch_run(
 
         _harmonic_index.propagate(steps=3, mode="local")
         idx_state = _harmonic_index.state()
+
+        # Notion Reservoir ticks — one per hub, CAIRRN-native.
+        # All land in the bus jobs dir as queued notion.tick jobs; the
+        # in-transit batcher in tasks_notion.py merges overlapping shards
+        # into a single fetch-increment-write before touching the Notion API.
+        for _eff_hub, _mod_val, _coh in _notion_ticks:
+            _cairrn_notion_tick(
+                _eff_hub,
+                metric=_mod_val,
+                coherence=_coh,
+                note_prefix="cairrn-batch",
+            )
+
         _vault_hub.push_harmonic(idx_state)
 
         hub_results: dict[str, Any] = {}
