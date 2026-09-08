@@ -118,7 +118,7 @@ def _notion_request(
     body: dict | None = None,
     token: str | None = None,
 ) -> dict:
-    token = token or os.environ.get("NOTION_TOKEN", "")
+    token = token or os.environ.get("NOTION_TOKEN") or os.environ.get("notion", "")
     if not token:
         raise RuntimeError("NOTION_TOKEN not set")
     url = f"https://api.notion.com/v1/{path.lstrip('/')}"
@@ -166,7 +166,7 @@ def notion_tick(
         "errors": [],
     }
 
-    token_resolved = token or os.environ.get("NOTION_TOKEN", "")
+    token_resolved = token or os.environ.get("NOTION_TOKEN") or os.environ.get("notion", "")
     can_write = bool(token_resolved) and not dry_run
 
     for name in activated_shards:
@@ -275,5 +275,5 @@ def notion_reservoir_state() -> dict[str, Any]:
         "edges_db_id": EDGES_DB_ID,
         "scores_collection": SCORES_COLLECTION,
         "hub_to_shard_map": HUB_TO_SHARD,
-        "token_configured": bool(os.environ.get("NOTION_TOKEN")),
+        "token_configured": bool(os.environ.get("NOTION_TOKEN") or os.environ.get("notion")),
     }
