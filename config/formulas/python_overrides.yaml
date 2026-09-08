@@ -1,0 +1,103 @@
+# config/formulas/python_overrides.yaml
+#
+# Manual python_expr overrides for formulas that cannot be auto-translated.
+#
+# Format:
+#   formula_id: "python expression string"
+#
+# The expression is eval'd in the FormulaRegistry math namespace which includes:
+#   abs, sqrt, exp, log, log2, tanh, sigmoid, clamp, sign, dot, norm,
+#   pi, e, inf, sum, min, max, round, len, range
+#
+# Pass variable values as kwargs to REGISTRY.call(formula_id, **kwargs).
+# Use the 'variables' map in each formula's YAML entry for the symbol names.
+#
+# Sum-over-list formulas expect the caller to pass Python lists/iterables.
+# Scalar-only callers should pass a list with one element.
+
+# ── sum-with-index notation → Python list versions ────────────────────────
+
+F_LOCATION_ROUTE: >-
+  abs(x / F) * abs(T * sum(D_w))
+
+F_ENERGY_WEIGHTED: >-
+  sum(abs(xi - zi) / A * T_Dw_i for xi, zi, T_Dw_i in zip(x_list, z_list, T_Dw_list)) * n_w
+
+F_ENERGY_WEIGHTED_GEOM: >-
+  sum(abs(xi - zi) * A**(2*w - 1) / (T_i * n_w) for xi, zi, T_i in zip(x_list, z_list, T_list))
+
+F_LOCAL_COHERENCE: >-
+  sum(w_ij * sim_val / dist_val for w_ij, sim_val, dist_val in zip(w_list, sim_list, dist_list))
+
+F_BLOOM_UPDATE: >-
+  n_i + sum(cos_v / m_j * o_j for cos_v, m_j, o_j in zip(cos_list, m_list, o_list))
+
+F_EDGE_WEIGHT: >-
+  sum(sim_val * reinforcement for sim_val, reinforcement in zip(sim_list, reinforcement_list))
+
+F_PATH_REINFORCEMENT: >-
+  sum(nutrient_list) / T
+
+F_PRESSURE_HEATMAP: >-
+  sum(flow_i * weight_i for flow_i, weight_i in zip(flow_list, weight_list))
+
+# ── set-intersection (Jaccard) — caller passes sets or lists ──────────────
+
+F_JACCARD_AFFINITY: >-
+  len(set(A) & set(B)) / max(len(set(A) | set(B)), 1e-9)
+
+# ── gradient notation — caller passes scalar gradient values ─────────────
+
+F_SEMANTIC_DRIFT: >-
+  grad_S_t - grad_S_prev
+
+# ── envelope / composite formulas ────────────────────────────────────────
+
+F_ENVELOPE_MAX: >-
+  A**w * abs(z - 2*c/K) * v * abs(i*v + 1) * bt
+
+F_COMPOSITE_HEALTH_HORIZON: >-
+  (abs(z+x) * abs(1-en)) / (B - 1) if B > 1 else inf
+
+F_JULES_NORM: >-
+  round(J, 3) - min_Jq
+
+F_DAWN_CONFIDENCE: >-
+  abs(k * jp) or D
+
+F_PERICLES: >-
+  abs(tc_A - Adp_At) * k / max(x, 1e-12)
+
+# ── physics / scalar formulas ─────────────────────────────────────────────
+
+F_MFPT: >-
+  1.0 / max(lam, 1e-300)
+
+F_LAMBERT_W: >-
+  -0.5671432904097838
+
+F_KRAMERS: >-
+  (omega_0 * omega_s) / (2 * pi) * exp(-DV / max(D, 1e-300))
+
+F_CONDUCTANCE: >-
+  sigmoid(kappa * w_ij)
+
+# ── single-step evaluations for iterative formulas ───────────────────────
+# These are one-step updates — not full trajectories.
+# The caller supplies the current state and gets the next-step value.
+
+F_HARMONIC_PROPAGATE: >-
+  a_i + kappa * (a_prev + a_next - 2 * a_i)
+
+F_GRADIENT_DESCENT: >-
+  x_n - lr * 4 * x_n * (x_n**2 - alpha**2)
+
+F_LANGEVIN: >-
+  x_n - lr * 4 * x_n * (x_n**2 - alpha**2) + sqrt(2 * D * lr) * xi
+
+F_RESONANCE_PROPAGATE: >-
+  exp((-cos(pi * a_p / max(A, 1e-9))) * (-cos(pi * d_i)))
+
+# ── truly unimplementable (leave as empty string — registry ignores these)─
+
+# F_COGNITIVE_GRAVITY: ""   # d/dr of a sum — requires symbolic differentiation

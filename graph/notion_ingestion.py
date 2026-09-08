@@ -339,6 +339,53 @@ def notion_to_md(page: dict, blocks: list[dict]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Formula patch — extract equation blocks and update FormulaRegistry
+# ---------------------------------------------------------------------------
+
+def _extract_equation_blocks(blocks: list[dict]) -> list[str]:
+    """Return all LaTeX expressions from equation blocks in a page."""
+    exprs: list[str] = []
+    for blk in blocks:
+        if blk.get("type") == "equation":
+            expr = blk.get("equation", {}).get("expression", "")
+            if expr:
+                exprs.append(expr)
+    return exprs
+
+
+def patch_formula_registry_from_page(
+    page: dict,
+    blocks: list[dict],
+) -> list[str]:
+    """
+    Look for equation blocks whose page title matches a formula id.
+    If a match is found, call FormulaRegistry.patch_from_notion() to update
+    the latex string and attempt re-translation.
+
+    Returns a list of formula ids that were updated.
+    """
+    try:
+        from workers.formula_registry import REGISTRY
+    except ImportError:
+        return []
+
+    title  = _page_title(page).upper().replace(" ", "_").replace("-", "_")
+    exprs  = _extract_equation_blocks(blocks)
+    updated: list[str] = []
+
+    for formula_id in list(REGISTRY._specs.keys()):
+        # Match by page title containing the formula id or vice versa
+        if formula_id in title or title in formula_id:
+            for expr in exprs:
+                if REGISTRY.patch_from_notion(formula_id, expr):
+                    _log.info("formula_registry patched %s from Notion", formula_id)
+                    updated.append(formula_id)
+            break
+
+    return updated
+
+
+# ---------------------------------------------------------------------------
 # Page → IngestedDoc conversion
 # ---------------------------------------------------------------------------
 
@@ -444,6 +491,8 @@ class NotionSyncer:
         n_pages = 0
         n_dbs   = 0
 
+        formula_updates: list[str] = []
+
         # ── 1. Standalone pages ─────────────────────────────────────────────
         try:
             pages = self._client.search_pages()
@@ -453,6 +502,7 @@ class NotionSyncer:
                 try:
                     blocks = self._client.get_block_children(page["id"])
                     docs.append(_page_to_doc(page, blocks))
+                    formula_updates.extend(patch_formula_registry_from_page(page, blocks))
                     n_pages += 1
                 except Exception as exc:  # noqa: BLE001
                     errors.append(f"page {page.get('id', '?')}: {exc}")
@@ -473,6 +523,9 @@ class NotionSyncer:
                         try:
                             blocks = self._client.get_block_children(page["id"])
                             docs.append(_page_to_doc(page, blocks))
+                            formula_updates.extend(
+                                patch_formula_registry_from_page(page, blocks)
+                            )
                             n_pages += 1
                         except Exception as exc:  # noqa: BLE001
                             errors.append(f"db-page {page.get('id', '?')}: {exc}")
@@ -492,6 +545,8 @@ class NotionSyncer:
                 errors.append(f"ingestion pipeline: {exc}")
 
         elapsed = time.monotonic() - t0
+        if formula_updates:
+            _log.info("sync_notion patched %d formula(s): %s", len(formula_updates), formula_updates)
         result  = SyncResult(
             n_pages     = n_pages,
             n_databases = n_dbs,
