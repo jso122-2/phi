@@ -378,6 +378,8 @@ READ_SUBS: Final[dict[str, str]] = {
     "find": "find",
     "audit": "code-audit",
     "context": "context-state",
+    "store": "vault-store",
+    "vault-store": "vault-store",
 }
 
 # Mutate umbrella: /do <sub> → catalog slash. Values must exist in CATALOG.
@@ -421,6 +423,8 @@ DO_SUBS: Final[dict[str, str]] = {
     "wait": "bus-wait",
     "restart": "bus-restart",
     "10": "10",
+    "project": "vault-project",
+    "migrate": "vault-migrate",
 }
 
 _HELP_TOKS: Final[frozenset[str]] = frozenset({"help", "--help", "--list", "subs", "subcommands"})
@@ -820,11 +824,29 @@ def extract_command(text: str) -> str | None:
     return None
 
 
+def catalog_markdown() -> str:
+    """Full SPECS table for COMMANDS.md — every slash from the phi build."""
+    lines = [
+        "## Full phi catalog",
+        "",
+        f"{len(SPECS)} slashes. Source of truth: `mcp_server.commands.SPECS`.",
+        "Call MCP `list_commands` or `run_command(\"/commands\")` for the live list.",
+        "",
+        "| Slash | Kind | MCP tool | Args |",
+        "|---|---|---|---|",
+    ]
+    for spec in SPECS:
+        args = " ".join(_args_for(spec)).replace("|", "\\|")
+        tool = f"`{spec.tool}`" if spec.tool else "—"
+        lines.append(f"| `/{spec.slash}` | {spec.kind} | {tool} | {args} |")
+    return "\n".join(lines) + "\n"
+
+
 def list_catalog(*, aliases: bool = False) -> list[dict[str, Any]]:
     """Serialisable catalog for list_commands / agents.
 
-    Primary view is `/read` + `/do` (nested subcommands) plus workflow
-    modes. Pass aliases=True for the flat legacy slash list.
+    aliases=False — `/read` + `/do` umbrellas plus workflow modes.
+    aliases=True  — every SPECS slash (the full phi build list).
     """
     if aliases:
         return [_spec_row(spec) for spec in SPECS]
@@ -1042,7 +1064,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"error": str(exc)}), file=sys.stderr)
             return 1
     if mode == "list":
-        print(json.dumps(list_catalog(), indent=2))
+        print(json.dumps(list_catalog(aliases=True), indent=2))
         return 0
     result = hook_main(mode)
     json.dump(result, sys.stdout)

@@ -313,6 +313,100 @@ Fix repo file tree — move, delete, normalise, update `.gitignore`.
 
 ---
 
+## Full phi catalog
+
+84 slashes. Source of truth: `mcp_server.commands.SPECS`.
+Call MCP `list_commands` or `run_command("/commands")` for the live list.
+
+| Slash | Kind | MCP tool | Args |
+|---|---|---|---|
+| `/sim` | mcp | `double_well_sim` | x0 |
+| `/neg-exp` | mcp | `neg_exp_sim` | x0 |
+| `/sweep` | mcp | `sweep_attractors` | [x0_min] [x0_max] [n_points] |
+| `/langevin` | mcp | `langevin_sim` | x0 |
+| `/mfpt` | mcp | `mfpt_estimate` | [noise_scale] |
+| `/ana-chi` | mcp | `ana_chi_sim` | [chi_0] |
+| `/ana-chi-state` | mcp | `ana_chi_state` | [chi] |
+| `/index` | mcp | `harmonic_index_state` |  |
+| `/propagate` | mcp | `harmonic_propagate` | [steps] |
+| `/inject` | mcp | `harmonic_inject` | shard_index value |
+| `/reset` | mcp | `harmonic_reset` |  |
+| `/hub-state` | mcp | `hub_state` |  |
+| `/hub-inject` | mcp | `hub_inject` | hub_name value |
+| `/set-goal` | mcp | `harmonic_set_goal` | target_shard |
+| `/clear-goal` | mcp | `harmonic_clear_goal` |  |
+| `/psspps` | mcp | `psspps_query` | <query…> |
+| `/find` | mcp | `find_query` | <query…> |
+| `/graph-commit` | mcp | `graph_commit` | <prompt> \| <thinking> \| <outcome> |
+| `/graph-clean` | mcp | `graph_clean` |  |
+| `/graph-nest` | mcp | `graph_nest` |  |
+| `/graph-link` | mcp | `graph_link` |  |
+| `/graph-status` | mcp | `graph_status` |  |
+| `/graph-traverse` | mcp | `graph_traverse` | <seed…> |
+| `/graph-topo-hubs` | mcp | `graph_topo_hubs` |  |
+| `/cairrn-topo` | mcp | `graph_topo_hubs` |  |
+| `/graph-ingest` | mcp | `graph_ingest` | source_dir |
+| `/graph-ingest-source` | mcp | `graph_ingest_source` | <packages…> |
+| `/graph-sync-manifest` | mcp | `graph_sync_manifest` | [manifest_path] |
+| `/graph-track` | mcp | `graph_track_state` |  |
+| `/graph-track-sync` | mcp | `graph_track_sync` |  |
+| `/graph-annotate` | mcp | `graph_annotate` | <target_stem> \| <comment> |
+| `/vault-hub` | mcp | `vault_hub_state` |  |
+| `/vault-store` | mcp | `vault_store_stats` |  |
+| `/vault-project` | mcp | `vault_project` | node_id |
+| `/vault-migrate` | mcp | `vault_migrate` | [batch_size] |
+| `/context-state` | mcp | `system_status` |  |
+| `/status` | mcp | `system_status` |  |
+| `/health` | mcp | `init_check` |  |
+| `/test` | mcp | `run_tests` | [mode] |
+| `/watchdog` | mcp | `watchdog_state` |  |
+| `/hooks` | mcp | `list_hooks` |  |
+| `/queue` | mcp | `dom_queue_state` |  |
+| `/commands` | mcp | `list_commands` |  |
+| `/cairrn-state` | mcp | `cairrn_hub_state` |  |
+| `/cairrn` | mcp | `hub_state` |  |
+| `/cairrn-run` | mcp | `cairrn_hub_run` | hub_name metric |
+| `/cairrn-batch` | mcp | `cairrn_batch_run` | [metric] |
+| `/cairrn-css` | mcp | `cairrn_css_state` |  |
+| `/cairrn-m3` | mcp | `cairrn_m3_gate` |  |
+| `/cairrn-k` | mcp | `cairrn_neuro_k` | tracer_consensus_value |
+| `/temporal-state` | mcp | `temporal_state` |  |
+| `/temporal-vector` | mcp | `temporal_vector` |  |
+| `/temporal-coherence` | mcp | `temporal_coherence` |  |
+| `/temporal-record` | mcp | `temporal_record` | hub_name value |
+| `/temporal-advance` | mcp | `temporal_advance` | [steps] |
+| `/temporal-reset` | mcp | `temporal_reset` |  |
+| `/phi-enqueue` | mcp | `phi_enqueue` | kind <query…> |
+| `/phi-step` | mcp | `phi_step` |  |
+| `/phi-queue` | mcp | `phi_queue` |  |
+| `/phi-flush` | mcp | `phi_flush` |  |
+| `/clip` | mcp | `gemini_clip` | <query…> |
+| `/shuffle-seed` | mcp | `shuffle_seed` |  |
+| `/shuffle-step` | mcp | `shuffle_step` |  |
+| `/shuffle-next` | mcp | `shuffle_next` | [peek_ahead] |
+| `/shuffle-state` | mcp | `shuffle_state` |  |
+| `/bus-submit` | mcp | `bus_submit` | task <payload_json…> |
+| `/bus-poll` | mcp | `bus_poll` | job_id |
+| `/bus-wait` | mcp | `bus_wait` | job_id |
+| `/bus-status` | mcp | `bus_status` |  |
+| `/bus-restart` | mcp | `bus_restart` |  |
+| `/forecast` | mcp | `forecast_state` |  |
+| `/code-audit` | mcp | `code_audit` | target [mode] |
+| `/10` | mcp | `rate_ten` | [target] |
+| `/coherence-state` | mcp | `coherence_state` | [tail] |
+| `/do` | dispatcher | — |  |
+| `/talk` | workflow | — |  |
+| `/explain` | workflow | — |  |
+| `/dev` | workflow | — |  |
+| `/modular` | workflow | — |  |
+| `/wire` | workflow | — |  |
+| `/edit` | workflow | — |  |
+| `/clean` | workflow | — |  |
+| `/audit` | workflow | — |  |
+| `/read` | workflow | — |  |
+
+---
+
 ## Auto-linked
 
 → [[CODE]]

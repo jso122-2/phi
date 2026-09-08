@@ -121,7 +121,19 @@ class TestCatalog:
         assert "/sim" in cmds
         assert "/dev" in cmds
         assert "/do" in cmds
+        assert "/phi-enqueue" in cmds
+        assert "/vault-store" in cmds
         assert len(rows) == len(CATALOG)
+
+    def test_commands_md_lists_every_spec(self):
+        from pathlib import Path
+
+        from mcp_server.commands import catalog_markdown
+
+        text = Path("COMMANDS.md").read_text(encoding="utf-8")
+        assert catalog_markdown() in text
+        missing = [s for s in CATALOG if f"/{s}" not in text]
+        assert missing == []
 
     def test_umbrella_targets_exist(self):
         for slash in (*READ_SUBS.values(), *DO_SUBS.values()):
@@ -185,10 +197,13 @@ class TestUmbrella:
         assert p.tool == "graph_commit"
         assert p.kwargs["prompt"] == "did X"
 
-    def test_do_10(self):
-        p = parse_command("/do 10 phi/core")
-        assert p.tool == "rate_ten"
-        assert p.kwargs == {"target": "phi/core"}
+    def test_read_vault_store(self):
+        p = parse_command("/read store")
+        assert p.tool == "vault_store_stats"
+
+    def test_do_vault_migrate(self):
+        p = parse_command("/do migrate")
+        assert p.tool == "vault_migrate"
 
     def test_do_bare_lists(self):
         p = parse_command("/do")

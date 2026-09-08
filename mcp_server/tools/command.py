@@ -12,6 +12,7 @@ from mcp_server.commands import (
     alias_map,
     list_catalog,
     parse_command,
+    _subs_listing,
 )
 
 
@@ -48,11 +49,13 @@ def _invoke(parsed: ParsedCommand) -> dict[str, Any]:
     if parsed.tool in {"run_command", "list_commands"}:
         # Avoid recursion; list is handled by list_commands itself.
         if parsed.tool == "list_commands":
+            rows = list_catalog(aliases=True)
             return {
                 "kind": "mcp",
                 "command": f"/{parsed.slash}",
                 "tool": "list_commands",
-                "commands": list_catalog(),
+                "n": len(rows),
+                "commands": rows,
                 "aliases": alias_map(),
             }
         return {"error": "recursive_dispatch", "command": parsed.raw}
@@ -85,16 +88,18 @@ def list_commands() -> dict[str, Any]:
     with _dom_queue.gate("list_commands"):
         if err := _pre_call("list_commands"):
             return err
-        rows = list_catalog()
+        rows = list_catalog(aliases=True)
         return {
             "n": len(rows),
             "commands": rows,
+            "read": _subs_listing("read"),
+            "do": _subs_listing("do"),
             "aliases": alias_map(),
             "dispatcher": "run_command",
             "hint": (
-                "Primary: /read <sub> … (inspect) and /do <sub> … (mutate). "
-                "Bare /read loads vault context. Old slashes still parse. "
-                "Call /read help or /do help for subcommands."
+                "Full phi SPECS catalog. Legacy /slash still parses. "
+                "/read <sub> inspects; /do <sub> mutates. "
+                "/read help and /do help list umbrella subcommands."
             ),
         }
 
