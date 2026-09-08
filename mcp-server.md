@@ -62,6 +62,7 @@ Attach custom stdio MCP **phi** (dashboard MCP dropdown or API `mcpServers`):
 | `psspps_query` | Perspective RAG |
 | `gemini_clip` / `phi_enqueue` / `phi_queue` | Phi library actions |
 | `phi_watchdog` | Pericles/Euler race-condition watchdog state |
+| `session_audit` | Runtime MCP call ledger — family breakdown, violations, sequence |
 
 `mcp_server.cloud` opens the session gate at spawn. If the mmap/celery worker is absent, `submit_and_maybe_wait` runs the registered bus task **in-process** (`source: "in-process"`).
 

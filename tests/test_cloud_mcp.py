@@ -125,7 +125,9 @@ def test_cloud_stdio_lists_search_tools():
         names = {t["name"] for t in listed["result"]["tools"]}
         assert "find_query" in names, sorted(names)
         assert "psspps_query" in names, sorted(names)
-        assert len(names) <= 60
+        assert "session_audit" in names, sorted(names)
+        assert "phi_watchdog" in names, sorted(names)
+        assert len(names) <= 70   # catalog grows; keep a reasonable ceiling
     finally:
         proc.terminate()
         try:

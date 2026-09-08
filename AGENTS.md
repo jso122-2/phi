@@ -52,6 +52,30 @@ Do not run `python -c` / `psspps.find.run_find` / `run_psspps` ad hoc. The same 
 Phi playback tools on the same server: `gemini_clip`, `phi_enqueue`, `phi_queue`.
 Race-condition tools: `phi_watchdog()` — Pericles/Euler watchdog state.
 
+## Runtime enforcement (enforced by `runtime_ledger` hook)
+
+Every MCP tool call is classified into a **family** and recorded in the
+session ledger.  The `runtime_ledger` pre-hook is registered at init time
+and fires before every tool call for the rest of the session.
+
+| Family | Canonical tools | Gated? |
+|---|---|---|
+| `init` | `init_check`, `system_status` | no |
+| `search` | `find_query`, `psspps_query` | yes — requires init |
+| `dispatch` | `phi_enqueue`, `phi_step`, `phi_queue`, `phi_flush`, `phi_watchdog` | yes |
+| `playback` | `gemini_clip`, `shuffle_seed`, `shuffle_next` | yes |
+| `graph` | `graph_commit`, `graph_traverse`, `graph_annotate`, … | yes |
+| `harmonic` | `harmonic_inject`, `hub_inject`, `harmonic_propagate`, … | yes |
+| `sim` | `double_well_sim`, `langevin_sim`, `sweep_attractors`, … | yes |
+| `cairrn` | `cairrn_hub_run`, `temporal_record`, … | yes |
+| `system` | `session_audit`, `list_hooks`, `run_command`, … | no |
+
+**Bypass is blocked**: calling `run_command` with a payload that shells out
+to `psspps.find`, `run_psspps`, or `run_find` raises a `HookViolation`.
+
+**Inspect compliance**: call `session_audit()` to read the full call ledger —
+total calls, per-family breakdown, violations, and the last N call records.
+
 ## Cursor Cloud specific instructions
 
 Cloud Agents do not inherit laptop `~/.cursor/mcp.json`. Attach stdio MCP **phi**:

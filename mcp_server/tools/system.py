@@ -355,6 +355,42 @@ def register_hook(name: str, description: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+def session_audit(tail: int = 50) -> dict[str, Any]:
+    """
+    Return the runtime MCP call ledger for this session.
+
+    Every tool call made since server startup is recorded here with its
+    timestamp, tool name, and family classification
+    (init / search / dispatch / graph / sim / playback / cairrn / harmonic /
+    system / other).  Violations (gate failures, bypass attempts) are flagged.
+
+    Use this to verify that your session is using the canonical MCP tools
+    correctly and in the right sequence.
+
+    Parameters
+    ----------
+    tail : number of recent call records to return (default 50, max 500)
+    """
+    with _dom_queue.gate("session_audit"):
+        from mcp_server._runtime_ledger import LEDGER
+        tail = max(1, min(int(tail), 500))
+        state = LEDGER.state(tail=tail)
+        state["tool_families"] = {
+            "search":   ["find_query", "psspps_query"],
+            "dispatch": ["phi_enqueue", "phi_step", "phi_queue", "phi_flush", "phi_watchdog"],
+            "playback": ["gemini_clip", "shuffle_seed", "shuffle_next"],
+            "graph":    ["graph_commit", "graph_ingest", "graph_traverse", "graph_annotate"],
+            "init":     ["init_check", "system_status"],
+        }
+        state["enforcement"] = {
+            "gated_families": sorted(["search", "dispatch", "playback", "graph", "harmonic", "sim", "cairrn"]),
+            "bypass_patterns": ["psspps.find", "run_psspps", "run_find", "psspps.pipeline"],
+            "hook": "runtime_ledger",
+        }
+        return state
+
+
+@mcp.tool()
 @requires_init
 def watchdog_state() -> dict[str, Any]:
     """

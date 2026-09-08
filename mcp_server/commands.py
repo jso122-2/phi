@@ -306,7 +306,10 @@ SPECS: tuple[CommandSpec, ...] = (
          flag_map={"peek": "peek_ahead"}),
     _mcp("shuffle-state", "shuffle_state", _SHUF, "Inspect shuffle + gate state."),
 
-    # -- bus / forecast / audit --------------------------------------------
+    # -- bus / forecast / session audit ------------------------------------
+    _mcp("session-audit", "session_audit", _SYS,
+         "Runtime MCP call ledger — family breakdown, violations, sequence.",
+         types={"tail": "int"}),
     _mcp("bus-submit", "bus_submit", _BUS, "Enqueue a mmap/celery bus job.",
          positionals=("task",), rest="payload_json"),
     _mcp("bus-poll", "bus_poll", _BUS, "Poll a bus job by id.",
