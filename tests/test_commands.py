@@ -5,6 +5,13 @@ import json
 
 import pytest
 
+from mcp_server.command_files import (
+    EXTRA_CONTRACTS,
+    PALETTE_SLASHES,
+    check_command_files,
+    render_files,
+    sync_command_files,
+)
 from mcp_server.commands import (
     CATALOG,
     DO_SUBS,
@@ -271,6 +278,144 @@ class TestCommandDispatchHook:
         _register_command_dispatch()
         results = REGISTRY.run("run_command", {"command": "/index"})
         assert any(r.name == "command_dispatch" and r.passed for r in results)
+
+
+class TestCommandFiles:
+    def test_render_covers_catalog_workflows_and_palette(self):
+        files = render_files()
+        for spec in CATALOG.values():
+            if spec.kind == "workflow" and spec.context_file:
+                assert spec.context_file in files
+                assert files[spec.context_file].startswith("# /")
+        for slash in PALETTE_SLASHES:
+            rel = f".cursor/commands/{slash}.md"
+            assert rel in files
+            assert files[rel].startswith("---\n")
+            assert "description:" in files[rel].split("---", 2)[1]
+        read_palette = files[".cursor/commands/read.md"]
+        assert "/read <sub>" in read_palette or "`index`" in read_palette
+        assert "harmonic_index_state" in read_palette
+        do_palette = files[".cursor/commands/do.md"]
+        assert "double_well_sim" in do_palette
+        for extra in EXTRA_CONTRACTS:
+            assert f".agent-context/{extra}.md" in files
+        assert ".cursor/rules/slash-commands.mdc" in files
+        assert ".cursor/hooks/command-hook.sh" in files
+
+    def test_sync_idempotent(self, tmp_path):
+        first = sync_command_files(tmp_path)
+        assert first["n_written"] == first["n_total"]
+        second = sync_command_files(tmp_path)
+        assert second["n_written"] == 0
+        assert second["n_unchanged"] == first["n_total"]
+        assert check_command_files(tmp_path) == []
+
+    def test_tool_calls_mdc_in_render(self):
+        files = render_files()
+        assert ".cursor/rules/tool-calls.mdc" in files
+        mdc = files[".cursor/rules/tool-calls.mdc"]
+        assert "hook chain" in mdc.lower() or "hook" in mdc
+        assert "cloud_agent" in mdc
+        assert "DOM" in mdc or "dom" in mdc.lower()
+
+    def test_repo_command_files_match_catalog(self):
+        problems = check_command_files()
+        assert problems == [], problems
+
+
+class TestHookPlugins:
+    def test_load_plugins_missing_dir(self, tmp_path):
+        from mcp_server.hook_plugins import load_plugins
+        from mcp_server.hooks import HookRegistry
+        reg = HookRegistry()
+        result = load_plugins(reg, hooks_dir=tmp_path / "no-such-dir")
+        assert result["hooks_dir_exists"] is False
+        assert result["n_loaded"] == 0
+
+    def test_load_plugins_valid_plugin(self, tmp_path):
+        from mcp_server.hook_plugins import load_plugins
+        from mcp_server.hooks import HookRegistry
+        plugin = tmp_path / "my_hook.py"
+        plugin.write_text(
+            "def register_plugins(registry):\n"
+            "    registry.register('my_test_hook', 'desc', lambda t, k: None)\n"
+        )
+        reg = HookRegistry()
+        result = load_plugins(reg, hooks_dir=tmp_path)
+        assert result["n_loaded"] == 1
+        assert "my_hook.py" in result["loaded"]
+        names = [h.name for h in reg._chain]
+        assert "my_test_hook" in names
+
+    def test_load_plugins_skips_non_plugin(self, tmp_path):
+        """Files not matching _is_plugin pattern are ignored entirely; files that
+        match but lack register_plugins() increment n_skipped."""
+        from mcp_server.hook_plugins import load_plugins
+        from mcp_server.hooks import HookRegistry
+        # This file name does not match any plugin suffix — silently ignored
+        (tmp_path / "helper.py").write_text("x = 1\n")
+        reg = HookRegistry()
+        result = load_plugins(reg, hooks_dir=tmp_path)
+        assert result["n_loaded"] == 0
+        # helper.py is not a plugin file so it is not scanned at all
+        assert result["n_skipped"] == 0
+        # A file that IS a plugin suffix but lacks register_plugins increments n_skipped
+        plugin_no_fn = tmp_path / "no_fn_hook.py"
+        plugin_no_fn.write_text("x = 1\n")
+        reg2 = HookRegistry()
+        result2 = load_plugins(reg2, hooks_dir=tmp_path)
+        assert result2["n_skipped"] == 1
+
+    def test_load_plugins_bad_plugin_is_recorded(self, tmp_path):
+        from mcp_server.hook_plugins import load_plugins
+        from mcp_server.hooks import HookRegistry
+        bad = tmp_path / "bad_hook.py"
+        bad.write_text("import nonexistent_xyz_module_12345\n")
+        reg = HookRegistry()
+        result = load_plugins(reg, hooks_dir=tmp_path)
+        assert result["n_errors"] == 1
+        assert "bad_hook.py" in result["errors"]
+
+    def test_load_plugins_idempotent(self, tmp_path):
+        from mcp_server.hook_plugins import load_plugins
+        from mcp_server.hooks import HookRegistry
+        plugin = tmp_path / "once_hook.py"
+        plugin.write_text(
+            "def register_plugins(registry):\n"
+            "    registry.register('once_hook', 'd', lambda t, k: None)\n"
+        )
+        reg = HookRegistry()
+        load_plugins(reg, hooks_dir=tmp_path)
+        load_plugins(reg, hooks_dir=tmp_path)
+        names = [h.name for h in reg._chain]
+        assert names.count("once_hook") == 1
+
+    def test_cloud_agent_hook_registers_three(self, tmp_path):
+        import importlib, sys, shutil
+        from mcp_server.hooks import HookRegistry
+        from mcp_server.hook_plugins import load_plugins
+
+        src = __import__("pathlib").Path(__file__).parent.parent / ".cursor" / "hooks" / "cloud_agent_hook.py"
+        shutil.copy(src, tmp_path / "cloud_agent_hook.py")
+        reg = HookRegistry()
+        result = load_plugins(reg, hooks_dir=tmp_path)
+        assert result["n_loaded"] == 1
+        names = {h.name for h in reg._chain}
+        assert "cloud_agent_run_limit" in names
+        assert "cloud_agent_tag_guard" in names
+        assert "cloud_agent_read_only" in names
+
+    def test_cloud_agent_tag_guard_rejects_none(self, tmp_path):
+        import shutil
+        from mcp_server.hooks import HookRegistry, HookViolation
+        from mcp_server.hook_plugins import load_plugins
+
+        src = __import__("pathlib").Path(__file__).parent.parent / ".cursor" / "hooks" / "cloud_agent_hook.py"
+        shutil.copy(src, tmp_path / "cloud_agent_hook.py")
+        reg = HookRegistry()
+        load_plugins(reg, hooks_dir=tmp_path)
+        with pytest.raises(HookViolation, match="None"):
+            reg.run("run_command", {"command": None})
 
 
 def test_hook_json_roundtrip():

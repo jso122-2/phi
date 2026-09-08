@@ -19,6 +19,16 @@ from psspps.scorer import build_tfidf, query_vector, semantic_scores
 
 SIMILARITY_THRESHOLD = 0.25
 MAX_LINKS_PER_NODE = 6
+
+# EdgeScorer is the formula-driven scorer; used for new link suggestions.
+# Falls back gracefully if REGISTRY is unavailable (workers.formula_registry
+# requires PyYAML and formula_dictionary.yaml to be present).
+try:
+    from graph.edge_scorer import SCORER as _EDGE_SCORER
+    _USE_FORMULA_SCORER = True
+except Exception:  # noqa: BLE001
+    _EDGE_SCORER = None
+    _USE_FORMULA_SCORER = False
 AUTO_LINK_MARKER = "## Auto-linked"
 _AUTO_LINK_LINE = re.compile(
     r"^→\s*\[\[([^\]|#\n]+?)(?:\|[^\]]+)?\]\]\s*$"
@@ -34,14 +44,42 @@ def score_against_corpus(
     target: VaultNode,
     corpus: list[VaultNode],
 ) -> list[tuple[float, VaultNode]]:
-    """Return (score, node) pairs for every node in corpus except target."""
+    """
+    Return (score, node) pairs for every node in corpus except target.
+
+    When the FormulaRegistry is available, scoring goes through
+    EdgeScorer → F_COSINE_SIMILARITY, F_JACCARD_AFFINITY, F_RAG_PRIORITY.
+    Falls back to plain TF-IDF cosine similarity when the registry is absent.
+    """
     from psspps.retriever import _clean
 
+    if _USE_FORMULA_SCORER and _EDGE_SCORER is not None:
+        # Formula-driven path: TF-IDF embeddings + registry formula weighting
+        texts = [_clean(n.text) for n in corpus]
+        mat, vocab = build_tfidf(texts)
+        q_text = target.title + " " + _clean(target.text)
+        q = query_vector(q_text, vocab)
+
+        import numpy as np
+        results: list[tuple[float, VaultNode]] = []
+        for i, node in enumerate(corpus):
+            if node.stem == target.stem:
+                continue
+            cos_raw = float(mat[i] @ q)
+            jac, _  = _EDGE_SCORER.jaccard_affinity(
+                list(target.tags or []), list(node.tags or [])
+            )
+            rp, _ = _EDGE_SCORER.rag_priority(
+                X_norm=max(cos_raw, 0.0), T_pos=1.0 - jac
+            )
+            results.append((float(rp), node))
+        return results
+
+    # Fallback: plain TF-IDF cosine
     texts = [_clean(n.text) for n in corpus]
     mat, vocab = build_tfidf(texts)
     q = query_vector(target.title + " " + _clean(target.text), vocab)
     scores = semantic_scores(q, mat)
-
     return [
         (float(scores[i]), corpus[i])
         for i in range(len(corpus))

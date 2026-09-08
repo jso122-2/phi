@@ -21,6 +21,7 @@ COMMENTS_DIR = SESSIONS_DIR / "comments"
 SKIP_DIRS = frozenset({
     ".obsidian", "__pycache__", ".git", ".hub.git",
     ".pytest_cache", "node_modules", "cursor-ingest",
+    ".cursor",
 })
 _SKIP_DIRS = SKIP_DIRS
 

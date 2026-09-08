@@ -1,0 +1,211 @@
+---
+description: >
+  Tool call system — hook chain, session gate, DOM houses, plugin extension
+  points.  Read before making tool calls or adding hooks.
+alwaysApply: false
+globs:
+  - mcp_server/**/*.py
+  - .cursor/hooks/**
+---
+
+# Tool call system
+
+Every call to a `spotify-rip` MCP tool passes through three layers in order:
+
+```
+1. Session gate      — block if init not done (init-free tools bypass this)
+2. Pre-hook chain    — ordered list of validators; any can raise HookViolation
+3. DOM house gate    — serialising BMAD lock; one house per workflow mode
+```
+
+## Session gate
+
+Tools that require an open session: everything **not** in the init-free set.
+Call `init_check()` or `system_status()` first to open the gate.
+
+Init-free tools (no session required): `bus_poll`, `bus_status`, `dom_queue_state`, `forecast_state`, `graph_clean`, `graph_nest`, `graph_status`, `graph_track_state`, `init_check`, `list_commands`, `list_hooks`, `register_hook`, `run_command`, `system_status`
+
+The gate contract hash is returned by `init_check` and `system_status` in the
+`gate_contract_hash` field — use it to verify the gate has not been bypassed.
+
+## Pre-hook chain (`mcp_server/hooks.py`)
+
+An append-only registry of hook functions.  Every function runs before the
+tool body.  Raise `HookViolation` to abort.
+
+**Built-in base hooks (immutable after `_seal_base()`):**
+
+| Hook | Purpose |
+|---|---|
+| `audit_log` | Log every tool call name + arg keys to stderr |
+| `nan_guard` | Reject float args containing NaN or Inf |
+| `param_bounds_guard` | Enforce safe bounds on lr, steps, alpha, value, … |
+
+**Session hooks (registered at gate-open by `_startup_init`):**
+
+| Hook | Purpose |
+|---|---|
+| `psspps_context` | Stream PSSPPS background signal; emit notification when ready |
+| `code_change_guard` | Mandate open gate + non-empty fields for graph writes |
+| `harmonic_guard` | Validate shard_index, hub_name, propagation mode |
+| `cairrn_guard` | Validate CAIRRN hub names |
+| `phi_action_guard` | Validate phi action kinds |
+| `sim_guard` | Clamp x0 to safe range |
+| `temporal_graph_guard` | Validate temporal record inputs |
+| `search_guard` | Require non-empty query |
+| `command_dispatch` | Parse + validate run_command slash strings |
+
+**Cloud-agent default hooks (loaded from `.cursor/hooks/cloud_agent_hook.py`):**
+
+| Hook | Purpose |
+|---|---|
+| `cloud_agent_run_limit` | Abort after N calls (SPOTIFY_RIP_SESSION_CALL_LIMIT, 0 = off) |
+| `cloud_agent_tag_guard` | Reject empty / non-string `run_command` arguments |
+| `cloud_agent_read_only` | Block mutating tools when SPOTIFY_RIP_READ_ONLY=1 |
+
+**Sequence enforcer hook (loaded from `.cursor/hooks/sequence_hook.py`):**
+
+| Hook | Purpose |
+|---|---|
+| `sequence_enforcer` | Enforce prerequisite tool-call ordering per session (see below) |
+
+## Sequence enforcer (`mcp_server/sequence_enforcer.py`)
+
+Adds a `CallLedger` — a thread-safe, append-only log of every tool call this
+session — and a ruleset of `SequenceRule` objects that gate certain tools
+behind prerequisites:
+
+```
+tool must only run after [prerequisite list] has been called
+```
+
+**Built-in rules (`DEFAULT_SEQUENCES`):**
+
+| Tool | Requires first | Reason |
+|---|---|---|
+| `graph_commit` | `system_status` | Confirm env health before vault mutation |
+| `graph_ingest` | `graph_status` | Verify graph integrity before adding nodes |
+| `graph_ingest_source` | `graph_status` | Same |
+| `graph_link` | `graph_status` | Same |
+| `harmonic_propagate` | `harmonic_index_state` | Read shard state before propagating |
+| `harmonic_inject` | `harmonic_index_state` | Same |
+| `hub_inject` | `hub_state` | Read hub before injecting |
+| `harmonic_reset` | `harmonic_index_state` | Capture state before reset |
+| `sweep_attractors` | `harmonic_index_state` | Simulation sanity |
+| `ana_chi_sim` | `harmonic_index_state` | Simulation sanity |
+
+**Notion-aware rule (added by `sequence_hook.py`):**
+
+| Tool | Requires first | Reason |
+|---|---|---|
+| `graph_commit` | `sync_notion` | If Notion sync was run this session, commit after sync |
+
+Disable: `SPOTIFY_RIP_DISABLE_SEQUENCE_ENFORCER=1`
+
+Extend with extra rules:
+
+```python
+from mcp_server.sequence_enforcer import SequenceRule, build_enforcer
+
+enforcer = build_enforcer(extra_rules=[
+    SequenceRule(
+        tool     = "my_mutating_tool",
+        requires = ["my_inspect_tool"],
+        message  = "Inspect before mutating.",
+    ),
+])
+```
+
+## Notion → Obsidian flow (`graph/notion_ingestion.py`)
+
+The **reservoir** (Notion) and the **graph** (Obsidian vault) are separate
+layers with a one-way sync pipeline:
+
+```
+Notion (reservoir)
+  └─ databases, pages, blocks
+        │ NotionClient.fetch_all_pages()
+        │ notion_to_md()
+        ▼
+  Obsidian vault/notion/*.md
+        │ IngestionPipeline (embed + link)
+        ▼
+  harmonic index  ←  graph_commit
+```
+
+**Credentials:** `NOTION_API_TOKEN` (env var / Cursor secret)
+
+**MCP tool:** `sync_notion(max_pages=0, fetch_timeout=30)`
+
+**Recommended session flow:**
+
+```
+system_status()        → open gate, confirm env health
+sync_notion()          → pull Notion reservoir → vault nodes
+graph_status()         → verify graph integrity
+graph_commit(...)      → commit session + Notion nodes to harmonic index
+```
+
+The sequence enforcer ensures this order is respected automatically.
+
+## Hook plugins (`.cursor/hooks/`)
+
+Any Python file in `.cursor/hooks/` that ends in `_hook.py` and exposes a
+`register_plugins(registry)` function is auto-loaded at startup.
+
+```python
+# .cursor/hooks/my_hook.py
+def register_plugins(registry):
+    from mcp_server.hooks import HookViolation
+
+    def my_guard(tool_name: str, kwargs: dict) -> None:
+        if tool_name == "run_tests" and kwargs.get("coverage"):
+            raise HookViolation("Coverage blocked in this environment")
+
+    registry.register(
+        name="my_guard",
+        description="Block coverage in this env",
+        fn=my_guard,
+    )
+```
+
+Disable plugin loading: `SPOTIFY_RIP_DISABLE_CLOUD_AGENT_HOOKS=1`
+
+## DOM Request Queue (`mcp_server/dom_queue.py`)
+
+Tools are serialised into seven BMAD houses.  Concurrent calls to the same
+house queue; calls to different houses proceed in parallel.
+
+| House | Workflow | Key tools |
+|---|---|---|
+| `talk` | `/talk` | `double_well_sim`, `neg_exp_sim`, `sweep_attractors` |
+| `dev` | `/dev` | `run_tests` |
+| `modular` | `/modular` | `harmonic_index_state`, `harmonic_propagate`, `hub_state` |
+| `wire` | `/wire` | `psspps_query`, `find_query` |
+| `edit` | `/edit` | `harmonic_inject`, `hub_inject` |
+| `clean` | `/clean` | `harmonic_reset`, `init_check`, `system_status`, `dom_queue_state` |
+| `graph` | graph ops | `graph_commit`, `graph_ingest`, `graph_link` |
+
+## Inspect and register hooks
+
+```
+/read hooks          → list_hooks()      — full chain state
+/read status         → system_status()   — includes hook_chain_version
+register_hook(name, description)         — add a placeholder slot
+```
+
+## Quick reference
+
+```python
+from mcp_server.hooks import REGISTRY, HookViolation
+
+# Inspect
+print(REGISTRY.state())           # full chain
+print(REGISTRY.version)           # current length
+print(REGISTRY.base_version)      # immutable base count
+
+# Register (idempotent)
+REGISTRY.register("my_hook", "What it does", fn)
+```
+
+Restore command files: `python -m mcp_server.command_files`

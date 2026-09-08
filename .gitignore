@@ -27,8 +27,15 @@ htmlcov/
 # Embedding / MiniLM cache (rebuilt locally)
 .cache/
 
-# Nested Cursor dir — workspace rules live at repo-root .cursor/
-.cursor/
+# Nested Cursor dir — keep local MCP/project metadata ignored.
+# Command palette, slash-command rules, tool-call rule, and hooks are tracked.
+.cursor/*
+!.cursor/commands/
+!.cursor/commands/**
+!.cursor/rules/
+!.cursor/rules/**
+!.cursor/hooks/
+!.cursor/hooks/**
 
 # Runtime mycelial / tracer logs (rewritten every tick)
 agent-log/*.txt
