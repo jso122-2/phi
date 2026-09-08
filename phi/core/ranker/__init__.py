@@ -21,10 +21,10 @@ from ._constants import (
 )
 from ._context import bind_floor, session_capacity_signals
 from ._learn import active_weights, fit_from_play_stats, reset_learned
-from ._scoring import ash_yield
+from ._scoring import ash_yield, blend_c_e, helm_score
 from ._session import RankContext
 from ._tp_rar import tp_rar_score
-from ._track import TrackRanker
+from ._track import TrackRanker, spend_score
 
 __all__ = [
     "TrackRanker",
@@ -57,4 +57,7 @@ __all__ = [
     "adaptive_capacity",
     "cc_budget_score",
     "session_capacity_signals",
+    "blend_c_e",
+    "helm_score",
+    "spend_score",
 ]

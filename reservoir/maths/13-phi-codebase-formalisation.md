@@ -50,16 +50,15 @@ weight learning.
 ## Pipeline (next-track)
 
 ```
-C_E  →  TP_RAR keep/fill  →  Cc keep/fill  →  top-N
+C_E = λ·pc + (1−λ)·helm     λ ∈ [0.40, 0.60], falls as buoyancy rises
+     → TP_RAR keep/fill
+     → spend = Cc · S_arc / ((1+U_p)(1+B·p²)) keep/fill
+     → top-N
 ```
 
-1. `score` produces C_E (predicted_completion if present, else helm mix).
-2. `tp_rar_score(C_E, cl_E, Δt, p)` ranks the same pool.
-3. `keep_fill` keeps scores ≥ mean, then fills with the rest (`F_SECONDARY_MODEL_SELECT`).
-4. `cc_budget_score(AC, p, Tcv)` reorders by spendable budget.
-5. Same keep/fill, take N.
+Helm always runs. `predicted_completion` is a prior. Song D4 rides the phi_rank slot. Dragon D4_A feeds S_arc only. U_p is CODE incoherence (SCUP). P = Bσ² is cognitive pressure on spend.
 
-Adjacent structure (mood graph, genre tags) never increments Qe. Same Law 6 as Notion: annotation is routing, access is scoring.
+Ψ′ health horizon (Ti*) closes the CAIRRN dispatcher gate when `steps_since_tick > Ti*`. M3 still discards bad shuffle prefeed. χ* stays the GNN target; live T_B/χ is the observation.
 
 ---
 

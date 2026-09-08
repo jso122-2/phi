@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 import pathlib
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from phi.core.similarity import _cosine as _sim_cosine
 
@@ -15,6 +15,9 @@ from ._constants import (
     HELM_FLOOR,
     NOVELTY_HALF_LIFE,
     NOVELTY_NEVER_HEARD,
+    PRED_PRIOR_HI,
+    PRED_PRIOR_LO,
+    SONG_D4_BLEND,
     _ASH_BASE,
     _ASH_K,
     _ASH_T_MIN,
@@ -155,14 +158,68 @@ def _elo_normalised(elo: float) -> float:
 
 
 def _phi_rank(ann: dict) -> float:
-    """RankArm score from annotations, or 0.5 if missing."""
+    """RankArm score blended with song-derivative D4 when present.
+
+    Dragon D4_A is not used here — that feeds ArcScorer. Song D4 is the
+    library-curve quality prior and belongs on the helm phi_rank slot.
+    """
     v = ann.get("phi_rank")
     if v is None:
+        base = 0.5
+    else:
+        try:
+            base = max(0.0, min(1.0, float(v)))
+        except (TypeError, ValueError):
+            base = 0.5
+    d4 = ann.get("d4")
+    if d4 is None:
+        return base
+    try:
+        song = max(0.0, min(1.0, float(d4)))
+    except (TypeError, ValueError):
+        return base
+    return (1.0 - SONG_D4_BLEND) * base + SONG_D4_BLEND * song
+
+
+def _buoyancy(ann: dict) -> float:
+    raw = ann.get("buoyancy") if ann.get("buoyancy") is not None else ann.get("meta_score")
+    if raw is None:
         return 0.5
     try:
-        return max(0.0, min(1.0, float(v)))
+        return max(0.0, min(1.0, float(raw)))
     except (TypeError, ValueError):
         return 0.5
+
+
+def blend_c_e(helm: float, predicted: float | None, buoyancy: float) -> float:
+    """C_E = λ·pc + (1−λ)·helm. λ ∈ [PRED_PRIOR_LO, PRED_PRIOR_HI] vs buoyancy."""
+    helm = max(0.0, min(1.0, helm))
+    if predicted is None:
+        return helm
+    pc = max(0.0, min(1.0, predicted))
+    b = max(0.0, min(1.0, buoyancy))
+    lam = PRED_PRIOR_LO + (PRED_PRIOR_HI - PRED_PRIOR_LO) * (1.0 - b)
+    return lam * pc + (1.0 - lam) * helm
+
+
+def helm_score(
+    path: str,
+    library: Any,
+    ctx: "RankContext",
+    weights: dict[str, float],
+) -> float:
+    """Five-dim helm mix in [0, 1]. Always computed; predictor never skips this."""
+    ann = library.annotations.get(path) or {}
+    meta = library.meta_cache.get(path) or {}
+    stats = library.play_stats.get(path) or {}
+    w = _confidence_weights(ann, weights)
+    return (
+        w["genre"] * _genre_affinity(meta, ann, ctx)
+        + w["mood"] * _mood_affinity(ann, meta, ctx)
+        + w["novelty"] * _novelty_score(stats)
+        + w["elo"] * _elo_normalised(library.get_elo(path))
+        + w["phi_rank"] * _phi_rank(ann)
+    )
 
 
 def _confidence_weights(ann: dict, base: dict) -> dict:
@@ -178,8 +235,7 @@ def _confidence_weights(ann: dict, base: dict) -> dict:
     meta_score ∈ [0, 1] — legacy fallback only.
     buoyancy   ∈ [0, 1] — coverage × agreement; preferred signal.
     """
-    raw = ann.get("buoyancy") if ann.get("buoyancy") is not None else ann.get("meta_score")
-    buoy = max(0.0, min(1.0, float(raw) if raw is not None else 0.5))
+    buoy = _buoyancy(ann)
 
     # Helm dims: floor ensures they never fall below half their configured share.
     helm_scale = max(HELM_FLOOR, buoy)

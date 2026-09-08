@@ -7,9 +7,8 @@ observation from Library.play_stats.  At session restore, predicts completion_ra
 every track in the library under the *current* session context and writes the result as
 "predicted_completion" annotation.
 
-TrackRanker.score() reads "predicted_completion" first and bypasses the heuristic
-weighted sum when it is present.  This replaces the five-dimension hand-tuned ranker
-with a single learned function that captures all interactions end-to-end.
+TrackRanker.score() always computes the helm mix and blends
+``predicted_completion`` as a buoyancy-scaled prior (not a bypass).
 
 Feature vector (11 dimensions)
 -------------------------------

@@ -487,10 +487,13 @@ The Notion export never ingested `phi/`. These formulas were already running. Fu
 **Session fit**
 
 ```
-C_E = Σ w_k x_k
+C_E = λ · predicted_completion + (1−λ) · helm
+λ ∈ [0.40, 0.60]  (falls as buoyancy rises)
 ```
 
-Helm mix (genre 0.28, mood 0.28, novelty 0.23, elo 0.13, phi_rank 0.08), buoyancy-scaled, then TP-RAR keep/fill, then Cc keep/fill.
+Then TP-RAR keep/fill, then spend `Cc · S_arc / ((1+U_p)(1+B p²))` keep/fill.
+
+Song D4 rides phi_rank. Dragon D4_A feeds S_arc. Ψ′ Ti* closes the dispatcher gate.
 
 **Buoyancy**
 

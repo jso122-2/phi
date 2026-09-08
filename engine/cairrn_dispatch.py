@@ -825,7 +825,18 @@ class CAIRRNDispatcher:
 
     @property
     def gate_open(self) -> bool:
-        return self.coherence >= self._threshold
+        """Open only when Euler-coherence is above W(1) and Ψ′ horizon is intact.
+
+        ``f_composite_health_horizon`` (Ti*) is the desktop composite's safe
+        tick ceiling. Past that boundary the gate stays closed and prefeed
+        keeps running — same house as M3 discarding a bad shuffle.
+        """
+        if self.coherence < self._threshold:
+            return False
+        ti_star = self._last_health_horizon
+        if ti_star != float("inf") and self._steps_since_tick > ti_star:
+            return False
+        return True
 
     @property
     def queue_depth(self) -> int:

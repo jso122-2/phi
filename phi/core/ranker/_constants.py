@@ -49,6 +49,16 @@ AC_WEIGHT_S = 1.0 / 3.0
 AC_WEIGHT_T = 1.0 / 3.0
 CC_CEILING = _E_MAX
 CC_MA_FLOOR = 1e-12
+ARC_MA_FLOOR = 1e-12
+
+# predicted_completion is a prior on C_E, not a bypass. Share grows as buoyancy falls
+# so sparse catalog still listens to the ridge model; rich catalog keeps helm heading.
+PRED_PRIOR_LO: float = 0.40
+PRED_PRIOR_HI: float = 0.60
+
+# Song-derivative D4 (library curve, [0, 1]) rides the phi_rank helm slot.
+# Dragon D4_A stays geometric and feeds ArcScorer only.
+SONG_D4_BLEND: float = 0.15
 
 # Minimum fraction of base weight that helm dims (genre, mood, phi_rank) receive.
 # Prevents ELO/novelty from dominating via renormalisation when buoyancy is low.

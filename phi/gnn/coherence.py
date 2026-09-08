@@ -359,12 +359,10 @@ class CoherenceLayer(nn.Module):
         h_final = h_layers[-1]
         N = h_final.size(0)
 
-        # Determine the χ target: live graph geometry if available, else stored default
-        chi_target = (
-            float(topo_invariant.chi)
-            if topo_invariant is not None
-            else self.euler_chi_target
-        )
+        # χ* is the structural target (tree-like community by default).
+        # Live TopologicalInvariant supplies observed χ = V−E+T, not the target.
+        # Overriding the target with live χ made this term identically zero.
+        chi_target = self.euler_chi_target
 
         # ── Term 1: Negentropy (−J) ────────────────────────────────────────
         neg_e = negentropy_loss(h_final)

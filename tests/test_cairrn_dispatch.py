@@ -168,6 +168,14 @@ class TestGate:
         d._steps_since_tick = 100
         assert d.gate_open is True
 
+    def test_gate_stays_closed_past_health_horizon(self):
+        d = _make_dispatcher()
+        d._steps_since_tick = 100
+        d._last_health_horizon = 10.0
+        assert d.gate_open is False
+        d._last_health_horizon = float("inf")
+        assert d.gate_open is True
+
     def test_step_gated_after_enough_steps(self):
         d = _make_dispatcher()
         d._steps_since_tick = 9   # 1 - exp(-0.9) ≈ 0.593 ≥ threshold → gate open

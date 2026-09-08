@@ -311,11 +311,16 @@ class TestTrackRankerIntegration:
     def test_score_uses_predicted_completion_when_present(self):
         from phi.core.ranker._track import TrackRanker
         from phi.core.ranker._session import RankContext
+        from phi.core.ranker._scoring import blend_c_e, helm_score
+        from phi.core.ranker._constants import WEIGHTS
+
         lib = self._make_ranker_library(with_prediction=True, prediction=0.73)
         ctx = RankContext()
         ranker = TrackRanker()
+        helm = helm_score("/a", lib, ctx, dict(WEIGHTS))
         score = ranker.score("/a", lib, ctx)
-        assert score == pytest.approx(0.73)
+        assert score == pytest.approx(blend_c_e(helm, 0.73, 0.5))
+        assert score != pytest.approx(0.73)
 
     def test_score_falls_back_to_heuristic_when_absent(self):
         from phi.core.ranker._track import TrackRanker
@@ -323,17 +328,20 @@ class TestTrackRankerIntegration:
         lib = self._make_ranker_library(with_prediction=False)
         ctx = RankContext()
         ranker = TrackRanker()
-        score = ranker.score("/a", lib, ctx)
         # Should return something in [0, 1] from the heuristic path
-        assert 0.0 <= score <= 1.0
+        assert 0.0 <= ranker.score("/a", lib, ctx) <= 1.0
 
     def test_predicted_completion_is_clamped(self):
         from phi.core.ranker._track import TrackRanker
         from phi.core.ranker._session import RankContext
+        from phi.core.ranker._scoring import blend_c_e, helm_score
+        from phi.core.ranker._constants import WEIGHTS
+
         lib = self._make_ranker_library(with_prediction=True, prediction=1.5)
         ctx = RankContext()
         ranker = TrackRanker()
-        assert ranker.score("/a", lib, ctx) == pytest.approx(1.0)
+        helm = helm_score("/a", lib, ctx, dict(WEIGHTS))
+        assert ranker.score("/a", lib, ctx) == pytest.approx(blend_c_e(helm, 1.0, 0.5))
 
 
 # ── maybe_predict_and_annotate ────────────────────────────────────────────────
