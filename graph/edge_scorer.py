@@ -422,25 +422,45 @@ class EdgeScorer:
         trace:    dict[str, Any] = {}
         fallback: bool           = False
 
+        # Lazy-import the gate so score_pair works even when mcp_server is
+        # not on the path (e.g. graph-only scripts).  Failures are silent
+        # — gate recording is best-effort; it must never block a score.
+        try:
+            from mcp_server.formula_gate import GATE as _gate
+        except Exception:  # noqa: BLE001
+            _gate = None
+
+        def _record(formula_id: str, result: float) -> None:
+            if _gate is not None:
+                try:
+                    _gate.record(formula_id, result)
+                except Exception:  # noqa: BLE001
+                    pass
+
         cos, fb = self.cosine_sim(vec_a, vec_b)
         trace["F_COSINE_SIMILARITY"] = round(cos, 6)
         fallback = fallback or fb
+        _record("F_COSINE_SIMILARITY", cos)
 
         jac, fb = self.jaccard_affinity(list(tags_a), list(tags_b))
         trace["F_JACCARD_AFFINITY"] = round(jac, 6)
         fallback = fallback or fb
+        _record("F_JACCARD_AFFINITY", jac)
 
         ew, fb = self.edge_weight([cos], [jac + 1.0])
         trace["F_EDGE_WEIGHT"] = round(ew, 6)
         fallback = fallback or fb
+        _record("F_EDGE_WEIGHT", float(ew))
 
         rp, fb = self.rag_priority(X_norm=cos, T_pos=1.0 - jac)
         trace["F_RAG_PRIORITY"] = round(rp, 6)
         fallback = fallback or fb
+        _record("F_RAG_PRIORITY", float(rp))
 
         pc, fb = self.path_cost(sim=cos, hop_count=hop_count)
         trace["F_PATH_COST"] = round(pc, 6)
         fallback = fallback or fb
+        _record("F_PATH_COST", float(pc))
 
         return EdgeScore(
             stem_a       = stem_a,
@@ -479,6 +499,18 @@ class EdgeScorer:
         """
         exclude = exclude or set()
 
+        try:
+            from mcp_server.formula_gate import GATE as _gate
+        except Exception:  # noqa: BLE001
+            _gate = None
+
+        def _record(formula_id: str, result: float) -> None:
+            if _gate is not None:
+                try:
+                    _gate.record(formula_id, result)
+                except Exception:  # noqa: BLE001
+                    pass
+
         target_norm = target_vec / (np.linalg.norm(target_vec) + 1e-12)
         corp_norms  = corpus_vecs / (
             np.linalg.norm(corpus_vecs, axis=1, keepdims=True) + 1e-12
@@ -495,10 +527,15 @@ class EdgeScorer:
             if cos < threshold:
                 continue
 
+            _record("F_COSINE_SIMILARITY", cos)
             jac, _ = self.jaccard_affinity(target_tags, tags)
+            _record("F_JACCARD_AFFINITY", float(jac))
             ew,  _ = self.edge_weight([cos], [jac + 1.0])
+            _record("F_EDGE_WEIGHT", float(ew))
             rp,  _ = self.rag_priority(X_norm=cos, T_pos=1.0 - jac)
+            _record("F_RAG_PRIORITY", float(rp))
             pc,  _ = self.path_cost(sim=cos)
+            _record("F_PATH_COST", float(pc))
 
             score = EdgeScore(
                 stem_a       = target_stem,
