@@ -1,0 +1,11 @@
+---
+description: Strategic discussion — align before building.
+---
+
+The user invoked `/talk` workflow mode.
+
+Read `.agent-context/talk.md` immediately and follow its behaviour contract for the rest of this session. Do not skip it.
+
+Optional: call MCP `run_command` with command=`/talk` to confirm the contract path.
+
+Strategic discussion — align before building.

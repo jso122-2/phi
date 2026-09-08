@@ -1,0 +1,114 @@
+---
+description: Slash command catalog — call MCP run_command, never Shell
+alwaysApply: true
+---
+
+# Slash commands
+
+Agents execute catalog slashes through the `spotify-rip` MCP server.
+Do **not** run `/command` in the Shell.
+
+## Primary surface
+
+- `/read <sub>` — inspect (read-only tools). Bare `/read` loads `.agent-context/read.md`.
+- `/do <sub>` — mutate. Bare `/do` lists subcommands.
+
+`/read help` and `/do help` list every subcommand.
+
+Inspect subs: `status`, `health`, `index`, `hub`, `ana-chi`, `graph`, `clean`, `nest`, `track`, `traverse`, `vault`, `watchdog`, `hooks`, `queue`, `commands`, `cairrn`, `css`, `m3`, `temporal`, `vector`, `temporal-coherence`, `phi`, `shuffle`, `bus`, `poll`, `forecast`, `coherence`, `psspps`, `find`, `audit`, `context`
+
+Mutate subs: `sim`, `neg-exp`, `sweep`, `langevin`, `mfpt`, `ana-chi`, `propagate`, `inject`, `reset`, `hub-inject`, `set-goal`, `clear-goal`, `commit`, `link`, `topo`, `cairrn-topo`, `ingest`, `ingest-source`, `sync`, `track-sync`, `annotate`, `test`, `cairrn`, `batch`, `k`, `record`, `advance`, `temporal-reset`, `enqueue`, `step`, `flush`, `clip`, `seed`, `shuffle-step`, `next`, `submit`, `wait`, `restart`, `10`
+
+## Preferred dispatch
+
+Call MCP `run_command` with the raw slash string (including `/read` / `/do` form).
+Legacy one-shot slashes still parse as aliases.
+
+## Workflow modes
+
+`/talk`, `/explain`, `/dev`, `/modular`, `/wire`, `/edit`, `/clean`, `/audit`, `/read`
+
+Read the matching `.agent-context/<slash>.md` immediately and follow it.
+
+## Legacy MCP aliases
+
+- `/sim` → `double_well_sim`
+- `/neg-exp` → `neg_exp_sim`
+- `/sweep` → `sweep_attractors`
+- `/langevin` → `langevin_sim`
+- `/mfpt` → `mfpt_estimate`
+- `/ana-chi` → `ana_chi_sim`
+- `/ana-chi-state` → `ana_chi_state`
+- `/index` → `harmonic_index_state`
+- `/propagate` → `harmonic_propagate`
+- `/inject` → `harmonic_inject`
+- `/reset` → `harmonic_reset`
+- `/hub-state` → `hub_state`
+- `/hub-inject` → `hub_inject`
+- `/set-goal` → `harmonic_set_goal`
+- `/clear-goal` → `harmonic_clear_goal`
+- `/psspps` → `psspps_query`
+- `/find` → `find_query`
+- `/graph-commit` → `graph_commit`
+- `/graph-clean` → `graph_clean`
+- `/graph-nest` → `graph_nest`
+- `/graph-link` → `graph_link`
+- `/graph-status` → `graph_status`
+- `/graph-traverse` → `graph_traverse`
+- `/graph-topo-hubs` → `graph_topo_hubs`
+- `/cairrn-topo` → `graph_topo_hubs`
+- `/graph-ingest` → `graph_ingest`
+- `/graph-ingest-source` → `graph_ingest_source`
+- `/graph-sync-manifest` → `graph_sync_manifest`
+- `/graph-track` → `graph_track_state`
+- `/graph-track-sync` → `graph_track_sync`
+- `/graph-annotate` → `graph_annotate`
+- `/vault-hub` → `vault_hub_state`
+- `/vault-store` → `vault_store_stats`
+- `/vault-project` → `vault_project`
+- `/vault-migrate` → `vault_migrate`
+- `/context-state` → `system_status`
+- `/status` → `system_status`
+- `/health` → `init_check`
+- `/test` → `run_tests`
+- `/watchdog` → `watchdog_state`
+- `/hooks` → `list_hooks`
+- `/queue` → `dom_queue_state`
+- `/commands` → `list_commands`
+- `/cairrn-state` → `cairrn_hub_state`
+- `/cairrn` → `hub_state`
+- `/cairrn-run` → `cairrn_hub_run`
+- `/cairrn-batch` → `cairrn_batch_run`
+- `/cairrn-css` → `cairrn_css_state`
+- `/cairrn-m3` → `cairrn_m3_gate`
+- `/cairrn-k` → `cairrn_neuro_k`
+- `/temporal-state` → `temporal_state`
+- `/temporal-vector` → `temporal_vector`
+- `/temporal-coherence` → `temporal_coherence`
+- `/temporal-record` → `temporal_record`
+- `/temporal-advance` → `temporal_advance`
+- `/temporal-reset` → `temporal_reset`
+- `/phi-enqueue` → `phi_enqueue`
+- `/phi-step` → `phi_step`
+- `/phi-queue` → `phi_queue`
+- `/phi-flush` → `phi_flush`
+- `/clip` → `gemini_clip`
+- `/shuffle-seed` → `shuffle_seed`
+- `/shuffle-step` → `shuffle_step`
+- `/shuffle-next` → `shuffle_next`
+- `/shuffle-state` → `shuffle_state`
+- `/bus-submit` → `bus_submit`
+- `/bus-poll` → `bus_poll`
+- `/bus-wait` → `bus_wait`
+- `/bus-status` → `bus_status`
+- `/bus-restart` → `bus_restart`
+- `/forecast` → `forecast_state`
+- `/code-audit` → `code_audit`
+- `/10` → `rate_ten`
+- `/coherence-state` → `coherence_state`
+
+If a command is missing on disk, restore with:
+
+```
+python -m mcp_server.command_files
+```

@@ -5,6 +5,13 @@ import json
 
 import pytest
 
+from mcp_server.command_files import (
+    EXTRA_CONTRACTS,
+    PALETTE_SLASHES,
+    check_command_files,
+    render_files,
+    sync_command_files,
+)
 from mcp_server.commands import (
     CATALOG,
     DO_SUBS,
@@ -271,6 +278,41 @@ class TestCommandDispatchHook:
         _register_command_dispatch()
         results = REGISTRY.run("run_command", {"command": "/index"})
         assert any(r.name == "command_dispatch" and r.passed for r in results)
+
+
+class TestCommandFiles:
+    def test_render_covers_catalog_workflows_and_palette(self):
+        files = render_files()
+        for spec in CATALOG.values():
+            if spec.kind == "workflow" and spec.context_file:
+                assert spec.context_file in files
+                assert files[spec.context_file].startswith("# /")
+        for slash in PALETTE_SLASHES:
+            rel = f".cursor/commands/{slash}.md"
+            assert rel in files
+            assert files[rel].startswith("---\n")
+            assert "description:" in files[rel].split("---", 2)[1]
+        read_palette = files[".cursor/commands/read.md"]
+        assert "/read <sub>" in read_palette or "`index`" in read_palette
+        assert "harmonic_index_state" in read_palette
+        do_palette = files[".cursor/commands/do.md"]
+        assert "double_well_sim" in do_palette
+        for extra in EXTRA_CONTRACTS:
+            assert f".agent-context/{extra}.md" in files
+        assert ".cursor/rules/slash-commands.mdc" in files
+        assert ".cursor/hooks/command-hook.sh" in files
+
+    def test_sync_idempotent(self, tmp_path):
+        first = sync_command_files(tmp_path)
+        assert first["n_written"] == first["n_total"]
+        second = sync_command_files(tmp_path)
+        assert second["n_written"] == 0
+        assert second["n_unchanged"] == first["n_total"]
+        assert check_command_files(tmp_path) == []
+
+    def test_repo_command_files_match_catalog(self):
+        problems = check_command_files()
+        assert problems == [], problems
 
 
 def test_hook_json_roundtrip():

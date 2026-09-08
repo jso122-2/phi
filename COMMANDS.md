@@ -3,7 +3,9 @@
 #hub #command
 
 Every command here is **agent-executable** via the `spotify-rip` MCP server.
-Agents read `.cursor/rules/slash-commands.mdc` and call the MCP tools directly.
+Agents read `.cursor/rules/slash-commands.mdc` and call MCP `run_command`.
+Cursor palette files live in `.cursor/commands/`. Workflow contracts live in `.agent-context/`.
+Restore them from the catalog with `python -m mcp_server.command_files`.
 
 ---
 
