@@ -27,6 +27,7 @@ CURSOR_MCP_TOOL_CAP = 60
 
 _TOOL_MODULES = [
     "command",
+    "context_modes",
     "bus",
     "cairrn",
     "forecast",

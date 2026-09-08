@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/command-hook.sh prompt",
+        "matcher": "UserPromptSubmit"
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/command-hook.sh shell",
+        "matcher": "^/"
+      }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": ".cursor/hooks/command-hook.sh mcp"
+      }
+    ]
+  }
+}

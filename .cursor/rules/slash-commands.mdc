@@ -1,0 +1,28 @@
+---
+description: Slash-command catalog — MCP run_command only, never Shell
+alwaysApply: true
+---
+
+# Slash commands
+
+Source of truth: `mcp_server.commands.SPECS`. Vault hub: [[COMMANDS]].
+
+When the user types a slash command:
+
+1. Call MCP `run_command` with the raw string (e.g. `/read index`, `/do sim 1.5`).
+2. Or call the listed MCP tool directly with parsed kwargs.
+3. Do not Shell the slash. Do not ask the user to run it.
+4. Unknown slash → `list_commands()` or `/read commands`.
+5. Workflow modes (`/talk` `/explain` `/dev` `/modular` `/wire` `/edit` `/clean` `/audit`): call `agent_context(mode="<mode>")` — the tool returns the full contract. Follow it immediately.
+
+Primary umbrellas: `/read <sub>` inspect, `/do <sub>` mutate. Bare `/read` is vault context. `/read help` and `/do help` list subs. Legacy slashes still parse.
+
+## /read
+
+status→system_status · health→init_check · index→harmonic_index_state · hub→hub_state · ana-chi→ana_chi_state · graph→graph_status · clean→graph_clean · nest→graph_nest · track→graph_track_state · traverse→graph_traverse · vault→vault_hub_state · vault-store→vault_store_stats · watchdog→watchdog_state · hooks→list_hooks · queue→dom_queue_state · commands→list_commands · cairrn→cairrn_hub_state · css→cairrn_css_state · m3→cairrn_m3_gate · temporal→temporal_state · vector→temporal_vector · temporal-coherence→temporal_coherence · phi→phi_queue · shuffle→shuffle_state · bus→bus_status · poll→bus_poll · forecast→forecast_state · coherence→coherence_state · psspps→psspps_query · find→find_query · audit→code_audit · context→system_status
+
+## /do
+
+sim→double_well_sim · neg-exp→neg_exp_sim · sweep→sweep_attractors · langevin→langevin_sim · mfpt→mfpt_estimate · ana-chi→ana_chi_sim · propagate→harmonic_propagate · inject→harmonic_inject · reset→harmonic_reset · hub-inject→hub_inject · set-goal→harmonic_set_goal · clear-goal→harmonic_clear_goal · commit→graph_commit · link→graph_link · topo→graph_topo_hubs · cairrn-topo→graph_topo_hubs · ingest→graph_ingest · ingest-source→graph_ingest_source · sync→graph_sync_manifest · track-sync→graph_track_sync · annotate→graph_annotate · vault-project→vault_project · vault-migrate→vault_migrate · test→run_tests · cairrn→cairrn_hub_run · batch→cairrn_batch_run · k→cairrn_neuro_k · record→temporal_record · advance→temporal_advance · temporal-reset→temporal_reset · enqueue→phi_enqueue · step→phi_step · flush→phi_flush · clip→gemini_clip · seed→shuffle_seed · shuffle-step→shuffle_step · next→shuffle_next · submit→bus_submit · wait→bus_wait · restart→bus_restart · 10→rate_ten
+
+Bare `/cairrn` → `hub_state`. `/cairrn HOME 1.0` → `cairrn_hub_run` (same as `/do cairrn`).

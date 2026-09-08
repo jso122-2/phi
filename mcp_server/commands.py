@@ -157,6 +157,7 @@ _FORE = "mcp_server.tools.forecast"
 _MOD = "mcp_server.tools.modular"
 _RATE = "mcp_server.tools.rate"
 _NTN = "mcp_server.tools.notion_reservoir"
+_CTX = "mcp_server.tools.context_modes"
 
 
 SPECS: tuple[CommandSpec, ...] = (
@@ -198,8 +199,9 @@ SPECS: tuple[CommandSpec, ...] = (
     _mcp("psspps", "psspps_query", _SEARCH, "PSSPPS vault RAG query.",
          rest="query", types={"top_k": "int", "perspective_alpha": "float", "wait_s": "float"},
          flag_map={"alpha": "perspective_alpha", "top-k": "top_k", "wait": "wait_s"}),
-    _mcp("find", "find_query", _SEARCH, "Pericles-scored exact vault retrieval.",
-         rest="query", flag_map={"wait": "wait_s"}, types={"wait_s": "float"}),
+    _mcp("find", "agent_context", _CTX,
+         "Hybrid search — Notion pages first, vault retrieval fallback.",
+         defaults={"mode": "find"}, init_free=True),
 
     # -- graph -------------------------------------------------------------
     _mcp("graph-commit", "graph_commit", _GRAPH,
@@ -335,15 +337,25 @@ SPECS: tuple[CommandSpec, ...] = (
 
     # -- umbrellas + workflow modes ----------------------------------------
     _disp("do", "Mutate — sim, inject, commit, enqueue, …"),
-    _wf("talk", ".agent-context/talk.md", "Strategic discussion — align before building."),
-    _wf("explain", ".agent-context/explain.md", "Plain-language explanation."),
-    _wf("dev", ".agent-context/dev.md", "Build mode — write, run, iterate."),
-    _wf("modular", ".agent-context/modular.md", "Package raw output cleanly."),
-    _wf("wire", ".agent-context/wire.md", "Connect imports, interfaces, pipeline."),
-    _wf("edit", ".agent-context/edit.md", "Surgical inline fixes."),
-    _wf("clean", ".agent-context/clean.md", "Fix repo file tree."),
-    _wf("audit", ".agent-context/audit.md", "Three-layer health audit."),
-    _wf("read", ".agent-context/read.md", "Inspect — bare loads vault context; /read <sub> dispatches."),
+    _mcp("talk",    "agent_context", _CTX, "Strategic discussion — align before building.",
+         defaults={"mode": "talk"},    init_free=True),
+    _mcp("explain", "agent_context", _CTX, "Plain-language explanation.",
+         defaults={"mode": "explain"}, init_free=True),
+    _mcp("dev",     "agent_context", _CTX, "Build mode — write, run, iterate.",
+         defaults={"mode": "dev"},     init_free=True),
+    _mcp("modular", "agent_context", _CTX, "Package raw output cleanly.",
+         defaults={"mode": "modular"}, init_free=True),
+    _mcp("wire",    "agent_context", _CTX, "Connect imports, interfaces, pipeline.",
+         defaults={"mode": "wire"},    init_free=True),
+    _mcp("edit",    "agent_context", _CTX, "Surgical inline fixes.",
+         defaults={"mode": "edit"},    init_free=True),
+    _mcp("clean",   "agent_context", _CTX, "Fix repo file tree.",
+         defaults={"mode": "clean"},   init_free=True),
+    _mcp("audit",   "agent_context", _CTX, "Three-layer health audit.",
+         defaults={"mode": "audit"},   init_free=True),
+    _mcp("read",    "agent_context", _CTX,
+         "Inspect — bare loads vault context; /read <sub> dispatches.",
+         defaults={"mode": "read"},    init_free=True),
 )
 
 CATALOG: Final[dict[str, CommandSpec]] = {s.slash: s for s in SPECS}
@@ -390,6 +402,7 @@ READ_SUBS: Final[dict[str, str]] = {
     "audit": "code-audit",
     "context": "context-state",
     "vault-store": "vault-store",
+    "notion-state": "notion-state",
 }
 
 # Mutate umbrella: /do <sub> → catalog slash. Values must exist in CATALOG.
@@ -435,6 +448,7 @@ DO_SUBS: Final[dict[str, str]] = {
     "10": "10",
     "vault-project": "vault-project",
     "vault-migrate": "vault-migrate",
+    "notion-tick": "notion-tick",
 }
 
 _HELP_TOKS: Final[frozenset[str]] = frozenset({"help", "--help", "--list", "subs", "subcommands"})
@@ -563,6 +577,7 @@ if _missing_umbrella:
     raise RuntimeError(f"umbrella targets missing from CATALOG: {_missing_umbrella}")
 
 # Dual-arity /cairrn stays a legacy slash (bare → hub_state, args → cairrn_hub_run).
+# agent_context modes (talk/dev/explain/…) are standalone entry-points, not sub-commands.
 _UMBRELLA_EXEMPT: Final[frozenset[str]] = frozenset({"cairrn", "read", "do"})
 _mcp_orphans = [
     s.slash
@@ -571,6 +586,7 @@ _mcp_orphans = [
     and s.slash not in READ_SUBS.values()
     and s.slash not in DO_SUBS.values()
     and s.slash not in _UMBRELLA_EXEMPT
+    and s.tool != "agent_context"   # standalone mode entry-points
 ]
 if _mcp_orphans:
     raise RuntimeError(f"MCP slashes missing from /read or /do: {_mcp_orphans}")
@@ -864,7 +880,7 @@ def list_catalog(*, aliases: bool = False) -> list[dict[str, Any]]:
             "/read <sub> dispatches a read-only tool."
         ),
         "init_free": True,
-        "context_file": ".agent-context/read.md",
+        "context_file": ".ai_agent_context/read.md",
         "subcommands": _subs_listing("read"),
     }
     do_row: dict[str, Any] = {
@@ -876,7 +892,8 @@ def list_catalog(*, aliases: bool = False) -> list[dict[str, Any]]:
     }
     rows = [read_row, do_row]
     for spec in SPECS:
-        if spec.kind == "workflow" and spec.slash != "read":
+        # Show agent_context modes (formerly "workflow") in the primary view.
+        if spec.tool == "agent_context" and spec.slash not in ("read",):
             rows.append(_spec_row(spec))
     return rows
 
@@ -998,12 +1015,27 @@ def _prompt_text(payload: dict[str, Any]) -> str:
 
 
 def _dispatch_context(parsed: ParsedCommand) -> str:
+    # agent_context modes: dispatch instruction (kind=="mcp", tool=="agent_context")
+    if parsed.tool == "agent_context":
+        mode = parsed.kwargs.get("mode", parsed.slash)
+        return (
+            f"SLASH COMMAND DISPATCH — call this MCP tool immediately. "
+            f"Do not use Shell. Do not ask the user to run it.\n"
+            f"Command: {parsed.raw}\n"
+            f"Preferred: run_command(command={parsed.raw!r})\n"
+            f"Direct: agent_context(mode={mode!r})\n"
+            f"{parsed.description}\n"
+            f"The tool returns the full contract. "
+            f"Follow it for the remainder of the session."
+        )
     if parsed.kind == "workflow":
+        # Legacy fallback (should not be reached after migration to _mcp).
         topic = parsed.kwargs.get("topic")
         extra = f" Topic argument: {topic!r}." if topic else ""
         return (
             f"WORKFLOW MODE /{parsed.slash} — {parsed.description}\n"
-            f"Read `{parsed.context_file}` immediately. {_WORKFLOW_ROOT_HINT}\n"
+            f"Read `.ai_agent_context/{parsed.slash}.md` immediately. "
+            f"{_WORKFLOW_ROOT_HINT}\n"
             f"Optional: call MCP run_command with command={parsed.raw!r} "
             f"to confirm the contract path.{extra}"
         )
