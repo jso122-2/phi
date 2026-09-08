@@ -58,6 +58,31 @@ def _make_block(btype: str, text: str = "hello", extra: dict | None = None) -> d
 # _page_title
 # ---------------------------------------------------------------------------
 
+class TestRichTextToStr:
+    def test_plain_text(self):
+        from graph.notion_ingestion import _rich_text_to_str
+        rt = [{"plain_text": "hello"}, {"plain_text": " world"}]
+        assert _rich_text_to_str(rt) == "hello world"
+
+    def test_inline_equation(self):
+        from graph.notion_ingestion import _rich_text_to_str
+        rt = [
+            {"plain_text": "Energy "},
+            {"type": "equation", "equation": {"expression": "E = mc^2"}},
+        ]
+        result = _rich_text_to_str(rt)
+        assert result == "Energy $E = mc^2$"
+
+    def test_mixed(self):
+        from graph.notion_ingestion import _rich_text_to_str
+        rt = [
+            {"type": "equation", "equation": {"expression": r"\alpha"}},
+            {"plain_text": " is the attractor"},
+        ]
+        result = _rich_text_to_str(rt)
+        assert r"$\alpha$" in result
+
+
 class TestPageTitle:
     def test_standard_title_property(self):
         page = _make_page(title="My Page")
@@ -126,6 +151,15 @@ class TestBlocksToMd:
         blk = {"type": "divider", "id": "d1", "divider": {}, "has_children": False}
         md  = _blocks_to_md([blk])
         assert "---" in md
+
+    def test_equation_block(self):
+        blk = {
+            "type": "equation", "id": "eq1", "has_children": False,
+            "equation": {"expression": r"\tau = \frac{1}{\lambda}"},
+        }
+        md = _blocks_to_md([blk])
+        assert "$$" in md
+        assert r"\tau" in md
 
     def test_unknown_type_comment(self):
         blk = {"type": "synced_block", "id": "s1", "synced_block": {}, "has_children": False}

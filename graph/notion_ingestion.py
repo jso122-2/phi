@@ -198,8 +198,20 @@ class NotionClient:
 # ---------------------------------------------------------------------------
 
 def _rich_text_to_str(rich_texts: list[dict]) -> str:
-    """Concatenate Notion rich_text array into plain text."""
-    return "".join(rt.get("plain_text", "") for rt in rich_texts)
+    """
+    Concatenate Notion rich_text array into markdown text.
+
+    Handles inline equations (type: "equation") as $...$ spans so that
+    Obsidian renders them correctly via MathJax.
+    """
+    parts: list[str] = []
+    for rt in rich_texts:
+        if rt.get("type") == "equation":
+            expr = rt.get("equation", {}).get("expression", "")
+            parts.append(f"${expr}$")
+        else:
+            parts.append(rt.get("plain_text", ""))
+    return "".join(parts)
 
 
 def _page_title(page: dict) -> str:
@@ -268,6 +280,11 @@ def _blocks_to_md(blocks: list[dict], depth: int = 0) -> str:
             icon = data.get("icon", {}).get("emoji", "")
             text = _rich_text_to_str(data.get("rich_text", []))
             lines.append(f"{indent}> {icon} {text}")
+
+        elif btype == "equation":
+            # Notion block-level LaTeX equation → Obsidian block math
+            expr = data.get("expression", "")
+            lines.append(f"\n$$\n{expr}\n$$\n")
 
         elif btype == "image":
             url_info = data.get("file") or data.get("external") or {}
