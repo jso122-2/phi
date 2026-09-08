@@ -16,10 +16,28 @@ def search_psspps(
 ) -> dict[str, Any]:
     import numpy as np
 
+    from psspps.hub_router import docs_to_hub_distribution, docs_to_notion_shards
     from psspps.pipeline import run_psspps
 
     vec = np.array(activations, dtype=float)
     result = run_psspps(query, vec, top_k=top_k, perspective_alpha=perspective_alpha)
+
+    # Build hub routing from top-doc affinity vectors (feedback loop)
+    top_affinities = [
+        np.array(d.affinity_vec, dtype=float)
+        for d in result.top_docs
+        if d.affinity_vec is not None
+    ]
+    hub_distribution: dict[str, int] = (
+        docs_to_hub_distribution(top_affinities) if top_affinities else {}
+    )
+    # Notion ticks fire only when retrieval was genuinely useful
+    notion_tick_shards: list[str] = (
+        docs_to_notion_shards(top_affinities, max_shards=2)
+        if result.rag_useful and top_affinities
+        else []
+    )
+
     return {
         "query": result.query,
         "retrieval_triggered": result.retrieval_triggered,
@@ -39,12 +57,21 @@ def search_psspps(
                 "perspective_score": d.perspective_score,
                 "partridge_score": d.partridge_score,
                 "combined_score": d.combined_score,
+                "peak_hub": d.peak_hub,
                 "headings": d.headings,
                 "wikilinks": d.wikilinks,
                 "snippet": d.snippet,
             }
             for d in result.top_docs
         ],
+        # --- side-effect routing fields ---
+        # hub_distribution → side_effects.pulse_hubs → harmonic injection
+        "hub_distribution": hub_distribution,
+        "pulse_scale": 0.08,   # gentle: each top doc adds 0.08 to its hub
+        # notion_tick_shards → side_effects → notion.tick bus task
+        "notion_tick_shards": notion_tick_shards,
+        "notion_tick_note": f"psspps:{query[:80]}",
+        # standard vault_sim for _vault_hub push
         "vault_sim_tool": "psspps_query",
         "vault_sim": {
             "query": query,
@@ -53,6 +80,7 @@ def search_psspps(
             "source": (modulation or {}).get("source"),
             "rag_useful": result.rag_useful,
             "n_docs": result.n_docs_searched,
+            "hub_distribution": hub_distribution,
         },
     }
 

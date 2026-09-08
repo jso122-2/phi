@@ -248,6 +248,58 @@ def _format_coherence_queue(queue: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _ground_harmonic_from_docs(
+    top_docs: list[dict[str, Any]],
+    activations: Any,
+) -> dict[str, int]:
+    """
+    Inject the session-open PSSPPS results into the harmonic ring.
+
+    This is the grounding step that makes PSSPPS the first layer: the vault
+    docs retrieved at session open shape the harmonic state, not just the
+    other way around.
+
+    Returns the hub_distribution dict for logging.
+    """
+    try:
+        import numpy as np
+        from psspps.hub_router import affinity_to_hub
+        from mcp_server._state import _harmonic_index
+
+        if _harmonic_index is None:
+            return {}
+
+        # Build hub distribution from top-doc affinity_vecs (if present)
+        hub_dist: dict[str, int] = {}
+        for doc in top_docs:
+            aff_raw = doc.get("affinity_vec")
+            if aff_raw:
+                hub = affinity_to_hub(np.array(aff_raw, dtype=float))
+            elif doc.get("peak_hub"):
+                hub = doc["peak_hub"]
+            else:
+                continue
+            hub_dist[hub] = hub_dist.get(hub, 0) + 1
+
+        if not hub_dist:
+            return {}
+
+        # Gentle injection: 0.08 per doc vote into each hub's shards
+        scale = 0.08
+        for hub_name, count in hub_dist.items():
+            value = min(count * scale, 0.50)  # cap per hub
+            _harmonic_index.inject_from_hub(hub_name, value=value)
+
+        # One local propagation step to spread the grounding signal
+        _harmonic_index.propagate(steps=1, mode="local")
+
+        return hub_dist
+
+    except Exception as exc:
+        print(f"[psspps_context_hook] grounding failed: {exc}", file=sys.stderr)
+        return {}
+
+
 def _write_and_notify(
     top_docs: list[dict[str, Any]],
     alpha: float,
@@ -256,10 +308,12 @@ def _write_and_notify(
     activations: Any = None,
 ) -> None:
     """
-    Write live-context.md (Phase 2) and fire the [coherence] ready sentinel.
+    Write live-context.md (Phase 2), ground the harmonic ring, fire sentinel.
 
-    Extends the existing live-context with a coherence queue section ordered by
-    shard activation score so the agent can orient its next actions.
+    Three actions in one:
+    1. Inject top-doc hub distribution into the harmonic ring (grounding).
+    2. Write live-context.md with PSSPPS results + coherence queue.
+    3. Emit [coherence] ready sentinel to stderr.
     """
     try:
         from graph.node import SESSIONS_DIR, write_live_context
@@ -271,20 +325,27 @@ def _write_and_notify(
             if "sessions/comments/" in d.get("path", "").replace("\\", "/")
         )
 
-        # Build coherence queue from live activations
+        # Phase 2a: ground the harmonic ring from the retrieved docs
+        hub_dist = _ground_harmonic_from_docs(top_docs, activations)
+
+        # Build coherence queue from live activations (post-grounding)
         queue = _build_coherence_queue(activations) if activations is not None else []
         queue_md = _format_coherence_queue(queue)
 
         # Write base live-context.md (PSSPPS results)
         written = write_live_context(top_docs)
 
-        # Append coherence queue section
+        # Append coherence queue + grounding summary
+        grounding_line = (
+            f"*Harmonic grounding: {hub_dist}*\n\n" if hub_dist else ""
+        )
         coherence_section = (
             "\n---\n\n"
             "## Coherence Queue\n\n"
             "*Hubs ordered by shard activation — highest harmonic pressure first.*\n\n"
             f"{queue_md}\n\n"
             "---\n\n"
+            f"{grounding_line}"
             f"*Phase 2 complete — source={source}, α={alpha:.2f}, "
             f"{len(top_docs)} docs, {n_comments} comment node(s).*\n"
         )
@@ -298,6 +359,7 @@ def _write_and_notify(
             "query":           query,
             "source":          source,
             "coherence_queue": queue,
+            "hub_distribution": hub_dist,
         })
 
         print(

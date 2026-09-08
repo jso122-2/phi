@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from psspps.hub_router import affinity_to_hub
 from psspps.retriever import VaultDoc, load_vault_docs
 from psspps.router import rag_was_useful, should_retrieve
 from psspps.scorer import (
@@ -59,6 +60,8 @@ class ScoredDoc:
     headings: list[str]
     wikilinks: list[str]
     snippet: str
+    peak_hub: str = "HOME"          # CAIRRN hub most aligned with this doc's affinity
+    affinity_vec: list[float] | None = None  # 8-dim basin affinity (kept for side-effect routing)
 
 
 @dataclass
@@ -152,6 +155,7 @@ def run_psspps(
         doc = docs[idx]
         snippet_src = doc["clean_text"]
         snippet = snippet_src[:220] + "…" if len(snippet_src) > 220 else snippet_src
+        aff = affinities[idx]
         top_docs.append(ScoredDoc(
             title=doc["title"],
             path=doc["path"],
@@ -163,6 +167,8 @@ def run_psspps(
             headings=doc["headings"][:5],
             wikilinks=doc["wikilinks"][:8],
             snippet=snippet,
+            peak_hub=affinity_to_hub(aff),
+            affinity_vec=[round(float(v), 5) for v in aff],
         ))
 
     try:

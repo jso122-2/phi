@@ -6,6 +6,43 @@ from typing import Any
 from mcp_server.bus.client import save_job
 
 
+def _notion_tick_async(shards: list[str], note: str = "") -> None:
+    """
+    Fire a Notion Reservoir tick for the given shards via the singleton bus.
+
+    Fire-and-forget: submits the bus task and returns immediately.  The tick
+    increments Qe/Ta in Notion so the Reservoir's stateful identity scores
+    (Ns1, Ns2, Classification) update correctly across sessions.
+
+    The SESSION_TOKEN (stamped at gate-open) is embedded in the note so every
+    Notion edge is traceable back to the session that generated it.  This is
+    the "shallow root / calcium identity" linkage — the Reservoir's edge graph
+    becomes a temporal map of which cognitive domains fired in which sessions.
+
+    Called from _apply() when a PSSPPS result carries notion_tick_shards.
+    Silent on any bus/token failure — the MCP session must not block on Notion.
+    """
+    try:
+        from mcp_server.bus.client import get_client, worker_alive
+        from mcp_server._gate import SESSION_TOKEN
+
+        client = get_client()
+        if client is None or not worker_alive():
+            return
+
+        # Prefix note with session token for Notion edge traceability
+        token_prefix = f"[{SESSION_TOKEN}] " if SESSION_TOKEN else ""
+        full_note = f"{token_prefix}{note[:100]}" if note else (token_prefix.rstrip())
+
+        client.submit("notion.tick", {
+            "shards":  ",".join(shards),
+            "note":    full_note[:120],
+            "dry_run": False,
+        })
+    except Exception:
+        pass
+
+
 def apply_side_effects(record: dict[str, Any]) -> dict[str, Any]:
     if record.get("status") != "done":
         return record
@@ -147,3 +184,9 @@ def _apply(result: dict[str, Any]) -> None:
         )
     elif pulse_hubs or pulse_home or result.get("touch_commit"):
         _vault_hub.push_all(harmonic=_harmonic_index.state())
+
+    # Notion Reservoir tick — fired when PSSPPS retrieval is useful.
+    # Uses the singleton bus so the write is async and never blocks tool returns.
+    notion_shards = result.get("notion_tick_shards")
+    if notion_shards and isinstance(notion_shards, list) and len(notion_shards) > 0:
+        _notion_tick_async(notion_shards, result.get("notion_tick_note", ""))

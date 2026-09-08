@@ -8,13 +8,18 @@ Requires NOTION_TOKEN env var (Notion integration secret) for direct API writes.
 Without a token the tool returns the computed payload for manual application.
 
 Shard registry is hardcoded from the live Notion workspace (jack dev's Space).
+
+CAIRRN hub → reservoir shard routing
+-------------------------------------
+CAIRRN hubs (HOME / MATH / CODE / COMMANDS / agent-context) map to reservoir
+shards via CAIRRN_HUB_TO_SHARD.  Use hub_to_shard() for safe lookup with None
+fallback.  The old HUB_TO_SHARD (DAWN/SCHEMA/RECUR keys) is removed.
 """
 from __future__ import annotations
 
 import json
 import math
 import os
-import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -61,14 +66,28 @@ SHARD_REGISTRY: dict[str, dict[str, Any]] = {
 EDGES_DB_ID = "82ab8055-ca05-49ef-a4ae-b176641e78fe"
 SCORES_COLLECTION = "54c008d6-e791-4f26-ab48-11dfe7c8e796"
 
-# Harmonic index → shard name routing (which phi hub → which Notion shard)
-HUB_TO_SHARD: dict[str, str] = {
-    "DAWN":      "dawn-fragments",
-    "SCHEMA":    "schema-fragments",
-    "RECUR":     "recursive-thought",
-    "VALENCE":   "valence-high",
-    "NOVEL":     "novel-fragments",
+# CAIRRN hub → reservoir shard routing.
+# Keys are the live harmonic-index hub names (HOME / MATH / CODE / COMMANDS /
+# agent-context).  Values are SHARD_REGISTRY keys.
+#
+# Rationale for the mapping:
+#   HOME         → dawn-fragments     (foundation / structural scaffolding)
+#   MATH         → recursive-thought  (formal / recursive computation)
+#   CODE         → novel-fragments    (synthesis / generative output)
+#   COMMANDS     → valence-high       (directive / high-charge actions)
+#   agent-context → schema-fragments  (semantic / narrative context)
+CAIRRN_HUB_TO_SHARD: dict[str, str] = {
+    "HOME":          "dawn-fragments",
+    "MATH":          "recursive-thought",
+    "CODE":          "novel-fragments",
+    "COMMANDS":      "valence-high",
+    "agent-context": "schema-fragments",
 }
+
+
+def hub_to_shard(hub_name: str) -> str | None:
+    """Translate a CAIRRN hub name to its reservoir shard name, or None if unmapped."""
+    return CAIRRN_HUB_TO_SHARD.get(hub_name)
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +128,7 @@ def compute_scores(
 
 
 # ---------------------------------------------------------------------------
-# Notion API helper
+# Notion API helpers
 # ---------------------------------------------------------------------------
 
 def _notion_request(
@@ -135,6 +154,28 @@ def _notion_request(
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
         return json.loads(resp.read())
+
+
+def _fetch_current_scores(page_id: str, token: str) -> dict[str, float]:
+    """
+    Fetch the current numeric score properties from a Notion Scores page.
+
+    Returns a dict with float values for any numeric property that exists on
+    the page (e.g. ``{"Qe": 5.0, "Ta": 3.0, ...}``).  Returns an empty dict
+    on any network / auth error so callers can safely fall back to 0.
+    """
+    try:
+        resp = _notion_request("GET", f"pages/{page_id}", token=token)
+        props = resp.get("properties", {})
+        result: dict[str, float] = {}
+        for key, val in props.items():
+            if isinstance(val, dict) and val.get("type") == "number":
+                num = val.get("number")
+                if isinstance(num, (int, float)):
+                    result[key] = float(num)
+        return result
+    except Exception:
+        return {}
 
 
 # ---------------------------------------------------------------------------
@@ -175,12 +216,21 @@ def notion_tick(
             results["errors"].append(f"unknown shard: {name}")
             continue
 
+        # Embed session token if available — makes the edge traceable in Notion
+        try:
+            from mcp_server._gate import SESSION_TOKEN as _TOKEN
+            _session_ref = f" [{_TOKEN}]" if _TOKEN else ""
+        except Exception:
+            _session_ref = ""
+
         # -- Edge write --
+        edge_note = session_note or f"phi tick — {name} activated"
+        edge_label = f"{name} :: activation :: {ts}{_session_ref}"
         edge_payload = {
             "parent": {"database_id": EDGES_DB_ID},
             "properties": {
                 "Label": {
-                    "title": [{"text": {"content": f"{name} :: activation :: {ts}"}}]
+                    "title": [{"text": {"content": edge_label}}]
                 },
                 "Type": {"select": {"name": "pure"}},
                 "Axis": {"select": {"name": reg["axis"]}},
@@ -189,20 +239,26 @@ def notion_tick(
                 "d": {"number": 1},
                 "Ns1_A": {"number": 0},
                 "Ns1_B": {"number": 0},
-                "Note": {"rich_text": [{"text": {"content": session_note or f"phi tick — {name} activated"}}]},
+                "Note": {"rich_text": [{"text": {"content": edge_note}}]},
             },
         }
 
         # -- Score update --
-        qe = 1  # incremental; caller should fetch current and add
+        # Fetch the current Qe / Ta from Notion so we increment correctly.
+        # Falls back to 0 when there is no token (dry-run / no-token path).
+        current = _fetch_current_scores(reg["score_page_id"], token_resolved) if can_write else {}
+        qe = int(current.get("Qe", 0)) + 1
+        ta = int(current.get("Ta", 0)) + 1
+        qe_adj = int(current.get("Qe_Adj", 0))
         scores = compute_scores(
-            qe=qe, ta=1, to_a=to_a,
+            qe=qe, ta=ta, to_a=to_a,
             si=reg["Si"], et=reg["Et"], ss=reg["Ss"], idx=reg["Idx"],
+            qe_adj=qe_adj,
         )
 
         score_patch = {
             "Qe": {"number": qe},
-            "Ta": {"number": 1},
+            "Ta": {"number": ta},
             "To_A": {"number": to_a},
             "Ec": {"number": scores["Ec"]},
             "Ns1": {"number": scores["Ns1"]},
@@ -213,7 +269,7 @@ def notion_tick(
 
         results["edges_written"].append({
             "shard": name,
-            "label": f"{name} :: activation :: {ts}",
+            "label": edge_label,
             "payload": edge_payload,
         })
         results["scores_updated"].append({
@@ -274,6 +330,6 @@ def notion_reservoir_state() -> dict[str, Any]:
         },
         "edges_db_id": EDGES_DB_ID,
         "scores_collection": SCORES_COLLECTION,
-        "hub_to_shard_map": HUB_TO_SHARD,
+        "cairrn_hub_to_shard": CAIRRN_HUB_TO_SHARD,
         "token_configured": bool(os.environ.get("NOTION_TOKEN")),
     }

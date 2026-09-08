@@ -70,7 +70,7 @@ def consume_forever(stop: Any = None) -> None:
             rec["started_at"] = time.time()
             save_job(rec)
             try:
-                result = run_task(str(task), rec.get("kwargs") or {})
+                result = run_task(str(task), rec.get("kwargs") or {}, job_id=str(job_id))
                 rec["status"] = "done"
                 rec["result"] = result
             except Exception as exc:

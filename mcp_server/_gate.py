@@ -3,6 +3,13 @@ mcp_server._gate — session gate, init protocol, and requires_init decorator.
 
 Protocol constants (PROTOCOL_VERSION, _GATE_CONTRACT_HASH) are Final so any
 change is detectable by agents that verify them in their init round-trips.
+
+SESSION_TOKEN
+-------------
+A short timestamp-based identifier stamped once at gate-open.  Embedded in
+Notion edge notes so every Reservoir activation is traceable back to the
+session that generated it.  Format: ``phi-YYYYMMDD-HHMMSSuuu`` (UTC, ms).
+Exported from this module so any tool can include it without importing _state.
 """
 from __future__ import annotations
 
@@ -10,6 +17,7 @@ import functools
 import hashlib
 import inspect
 import threading
+from datetime import datetime, timezone
 from typing import Any, Final
 
 from mcp_server.hooks import BASE_HOOK_COUNT as _BASE_HOOK_COUNT  # noqa: F401 (re-exported)
@@ -44,17 +52,24 @@ _VALID_PHI_KINDS: Final[frozenset[str]] = frozenset({
 _SIM_X0_RANGE: Final[tuple[float, float]] = (-1000.0, 1000.0)
 
 # ---------------------------------------------------------------------------
-# Session gate state
+# Session gate state + identity token
 # ---------------------------------------------------------------------------
 
 _session_initialized: bool = False
 _session_lock = threading.Lock()
 
+# Stamped once at gate-open; never changes within a process lifetime.
+# Format: phi-YYYYMMDD-HHMMSSuuu (UTC, milliseconds appended for uniqueness)
+SESSION_TOKEN: str = ""
+
 
 def open_gate() -> None:
-    """Mark the session as initialized (call after a successful env check)."""
-    global _session_initialized
+    """Mark the session as initialized and stamp the SESSION_TOKEN (idempotent)."""
+    global _session_initialized, SESSION_TOKEN
     with _session_lock:
+        if not SESSION_TOKEN:
+            now = datetime.now(timezone.utc)
+            SESSION_TOKEN = now.strftime("phi-%Y%m%d-%H%M%S") + f"{now.microsecond // 1000:03d}"
         _session_initialized = True
 
 
