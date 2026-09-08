@@ -434,3 +434,97 @@ class TestNotionFormulaPatch:
         from graph.notion_ingestion import _extract_equation_blocks
         assert _extract_equation_blocks([]) == []
         assert _extract_equation_blocks([{"type": "paragraph", "paragraph": {}}]) == []
+
+
+# ---------------------------------------------------------------------------
+# assert_ready and @requires_formulas enforcement
+# ---------------------------------------------------------------------------
+
+class TestAssertReady:
+    def test_assert_ready_passes_for_known_formulas(self):
+        from workers.formula_registry import REGISTRY
+        # Should not raise — all these are ready
+        REGISTRY.assert_ready("F_COSINE_SIMILARITY", "F_JACCARD_AFFINITY", "F_RAG_PRIORITY")
+
+    def test_assert_ready_raises_for_unknown_id(self):
+        from workers.formula_registry import REGISTRY, FormulaNotReady
+        with pytest.raises(FormulaNotReady, match="NOT_A_REAL_FORMULA"):
+            REGISTRY.assert_ready("NOT_A_REAL_FORMULA")
+
+    def test_assert_ready_raises_for_unimplemented(self):
+        """If a formula has status=unimplemented, assert_ready must raise."""
+        import tempfile, textwrap
+        from pathlib import Path
+        from workers.formula_registry import FormulaRegistry, FormulaNotReady
+        mini = textwrap.dedent("""\
+            formulas:
+              - id: F_UNIMPL
+                label: "Unimplementable"
+                expr: ""
+                output: r
+                layer: X
+        """)
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            f.write(mini)
+            path = Path(f.name)
+        reg = FormulaRegistry(yaml_path=path)
+        with pytest.raises(FormulaNotReady):
+            reg.assert_ready("F_UNIMPL")
+
+    def test_assert_ready_lists_all_missing(self):
+        from workers.formula_registry import REGISTRY, FormulaNotReady
+        with pytest.raises(FormulaNotReady) as exc_info:
+            REGISTRY.assert_ready("FAKE_A", "FAKE_B")
+        msg = str(exc_info.value)
+        assert "FAKE_A" in msg
+        assert "FAKE_B" in msg
+
+
+class TestRequiresFormulasDecorator:
+    def test_passes_when_formulas_ready(self):
+        from workers.formula_registry import requires_formulas
+
+        @requires_formulas("F_COSINE_SIMILARITY", "F_RAG_PRIORITY")
+        def compute():
+            return 42
+
+        assert compute() == 42
+
+    def test_raises_when_formula_missing(self):
+        from workers.formula_registry import requires_formulas, FormulaNotReady
+
+        @requires_formulas("F_COSINE_SIMILARITY", "THIS_DOES_NOT_EXIST")
+        def compute():
+            return 42
+
+        with pytest.raises(FormulaNotReady):
+            compute()
+
+    def test_decorator_preserves_function_name(self):
+        from workers.formula_registry import requires_formulas
+
+        @requires_formulas("F_COSINE_SIMILARITY")
+        def my_special_function():
+            pass
+
+        assert my_special_function.__name__ == "my_special_function"
+
+    def test_decorator_attaches_required_formulas_metadata(self):
+        from workers.formula_registry import requires_formulas
+
+        @requires_formulas("F_COSINE_SIMILARITY", "F_JACCARD_AFFINITY")
+        def fn():
+            pass
+
+        assert hasattr(fn, "_required_formulas")
+        assert "F_COSINE_SIMILARITY" in fn._required_formulas
+        assert "F_JACCARD_AFFINITY"  in fn._required_formulas
+
+    def test_decorator_passes_args_and_kwargs(self):
+        from workers.formula_registry import requires_formulas
+
+        @requires_formulas("F_COSINE_SIMILARITY")
+        def add(a, b, *, multiplier=1):
+            return (a + b) * multiplier
+
+        assert add(2, 3, multiplier=4) == 20

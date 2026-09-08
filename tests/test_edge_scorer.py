@@ -14,8 +14,10 @@ from graph.edge_scorer import (
     EdgeScore,
     EdgeScorer,
     SCORER,
+    EDGE_FORMULA_IDS,
     _fallback_cosine,
     _fallback_jaccard,
+    validate_edge_formulas,
 )
 
 
@@ -291,27 +293,142 @@ class TestEdgeScorerScoreCorpus:
 
 
 # ---------------------------------------------------------------------------
-# Registry fallback (when registry unavailable)
+# Strict mode enforcement
 # ---------------------------------------------------------------------------
 
-class TestRegistryFallback:
-    def test_cosine_fallback_when_registry_none(self):
-        scorer = EdgeScorer()
-        with patch("graph.edge_scorer._registry", return_value=None):
+class TestStrictMode:
+    def test_strict_true_raises_on_missing_formula(self):
+        """strict=True must raise FormulaNotReady when a formula is absent."""
+        from workers.formula_registry import FormulaNotReady
+
+        def bad_call(formula_id, **kwargs):
+            raise FormulaNotReady(f"{formula_id} not ready")
+
+        scorer = EdgeScorer(strict=True)
+        # Patch _call to simulate a missing formula at eval time
+        with patch.object(scorer, "_call", side_effect=bad_call):
+            with pytest.raises(FormulaNotReady):
+                scorer.cosine_sim([1.0, 0.0], [1.0, 0.0])
+
+    def test_strict_false_uses_fallback(self):
+        """strict=False falls back to Python math when formula fails."""
+        from workers.formula_registry import FormulaNotReady
+
+        def bad_call(formula_id, **kwargs):
+            raise FormulaNotReady(f"{formula_id} not ready")
+
+        scorer = EdgeScorer(strict=False)
+        with patch.object(scorer, "_call", side_effect=bad_call):
             cos, fallback = scorer.cosine_sim([1.0, 0.0], [1.0, 0.0])
         assert abs(cos - 1.0) < 1e-6
         assert fallback is True
 
-    def test_jaccard_fallback_when_registry_none(self):
-        scorer = EdgeScorer()
-        with patch("graph.edge_scorer._registry", return_value=None):
+    def test_strict_false_jaccard_fallback(self):
+        from workers.formula_registry import FormulaNotReady
+        scorer = EdgeScorer(strict=False)
+        with patch.object(scorer, "_call", side_effect=FormulaNotReady("x")):
             jac, fallback = scorer.jaccard_affinity(["a"], ["a"])
         assert abs(jac - 1.0) < 1e-6
         assert fallback is True
 
-    def test_rag_priority_fallback(self):
+    def test_strict_false_rag_priority_fallback(self):
+        from workers.formula_registry import FormulaNotReady
+        scorer = EdgeScorer(strict=False)
+        with patch.object(scorer, "_call", side_effect=FormulaNotReady("x")):
+            rp, fallback = scorer.rag_priority(X_norm=0.7, T_pos=0.1)
+        assert abs(rp - 0.6) < 1e-6
+        assert fallback is True
+
+    def test_strict_false_path_cost_fallback(self):
+        from workers.formula_registry import FormulaNotReady
+        scorer = EdgeScorer(strict=False)
+        with patch.object(scorer, "_call", side_effect=FormulaNotReady("x")):
+            pc, fallback = scorer.path_cost(sim=0.8, hop_count=1)
+        assert abs(pc - 0.2) < 1e-6
+        assert fallback is True
+
+    def test_default_is_strict(self):
+        """The default EdgeScorer() constructor is strict=True."""
         scorer = EdgeScorer()
-        with patch("graph.edge_scorer._registry", return_value=None):
+        assert scorer._strict is True
+
+    def test_SCORER_singleton_is_strict(self):
+        """Module-level SCORER is strict — not a soft dependency."""
+        assert SCORER._strict is True
+
+
+# ---------------------------------------------------------------------------
+# validate_edge_formulas
+# ---------------------------------------------------------------------------
+
+class TestValidateEdgeFormulas:
+    def test_all_required_formulas_ready(self):
+        """validate_edge_formulas() must pass with the real registry."""
+        report = validate_edge_formulas()
+        for fid in EDGE_FORMULA_IDS:
+            assert fid in report
+            assert report[fid] == "ready", f"{fid} is not ready: {report[fid]}"
+
+    def test_raises_when_formula_missing(self):
+        from workers.formula_registry import FormulaNotReady
+
+        # Patch REGISTRY.__contains__ to pretend a formula is missing
+        with patch("graph.edge_scorer._registry") as mock_reg:
+            mock_spec = MagicMock()
+            mock_spec.status = "unimplemented"
+            mock_instance = MagicMock()
+            mock_instance.__contains__ = MagicMock(return_value=False)
+            mock_reg.return_value = mock_instance
+
+            # validate_edge_formulas imports REGISTRY directly, so patch that
+            from workers import formula_registry as fr_mod
+            original = fr_mod.REGISTRY
+
+            class _FakeReg:
+                def __contains__(self, fid):
+                    return False
+                def inspect(self, fid):
+                    return {"status": "missing"}
+
+            fr_mod.REGISTRY = _FakeReg()
+            try:
+                with pytest.raises(FormulaNotReady):
+                    validate_edge_formulas()
+            finally:
+                fr_mod.REGISTRY = original
+
+    def test_edge_formula_ids_covers_six(self):
+        assert len(EDGE_FORMULA_IDS) == 6
+        assert "F_COSINE_SIMILARITY" in EDGE_FORMULA_IDS
+        assert "F_RAG_PRIORITY"      in EDGE_FORMULA_IDS
+        assert "F_PATH_COST"         in EDGE_FORMULA_IDS
+
+
+# ---------------------------------------------------------------------------
+# Registry fallback (when registry unavailable) — strict=False only
+# ---------------------------------------------------------------------------
+
+class TestRegistryFallback:
+    def test_cosine_fallback_non_strict(self):
+        from workers.formula_registry import FormulaNotReady
+        scorer = EdgeScorer(strict=False)
+        with patch.object(scorer, "_call", side_effect=FormulaNotReady("x")):
+            cos, fallback = scorer.cosine_sim([1.0, 0.0], [1.0, 0.0])
+        assert abs(cos - 1.0) < 1e-6
+        assert fallback is True
+
+    def test_jaccard_fallback_non_strict(self):
+        from workers.formula_registry import FormulaNotReady
+        scorer = EdgeScorer(strict=False)
+        with patch.object(scorer, "_call", side_effect=FormulaNotReady("x")):
+            jac, fallback = scorer.jaccard_affinity(["a"], ["a"])
+        assert abs(jac - 1.0) < 1e-6
+        assert fallback is True
+
+    def test_rag_priority_fallback_non_strict(self):
+        from workers.formula_registry import FormulaNotReady
+        scorer = EdgeScorer(strict=False)
+        with patch.object(scorer, "_call", side_effect=FormulaNotReady("x")):
             rp, fallback = scorer.rag_priority(X_norm=0.7, T_pos=0.1)
         assert abs(rp - 0.6) < 1e-6
         assert fallback is True

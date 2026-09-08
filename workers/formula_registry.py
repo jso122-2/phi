@@ -569,6 +569,58 @@ class FormulaRegistry:
     def __contains__(self, formula_id: str) -> bool:
         return formula_id in self._specs
 
+    def assert_ready(self, *formula_ids: str) -> None:
+        """
+        Assert that all listed formula IDs are present and ready.
+
+        Raises FormulaNotReady listing every missing / unimplemented formula.
+        Use this at function or class level to make formula dependencies
+        explicit and fail-fast rather than silently wrong.
+        """
+        missing: list[str] = []
+        for fid in formula_ids:
+            if fid not in self._specs:
+                missing.append(f"{fid} (not found)")
+                continue
+            spec = self._specs[fid]
+            if spec.status != "ready":
+                missing.append(f"{fid} ({spec.status})")
+        if missing:
+            raise FormulaNotReady(
+                "Required formulas are not ready: " + ", ".join(missing)
+            )
+
+
+# ---------------------------------------------------------------------------
+# @requires_formulas decorator
+# ---------------------------------------------------------------------------
+
+def requires_formulas(*formula_ids: str):
+    """
+    Decorator that enforces formula availability before a function runs.
+
+    Usage
+    -----
+    @requires_formulas("F_COSINE_SIMILARITY", "F_JACCARD_AFFINITY")
+    def my_scoring_fn(...):
+        ...
+
+    Raises FormulaNotReady at call time (not import time) if any listed
+    formula is absent or unimplemented.  This makes the Python contract
+    explicit: decorated functions cannot run without their math.
+    """
+    import functools
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            REGISTRY.assert_ready(*formula_ids)
+            return fn(*args, **kwargs)
+        # Attach metadata so introspection tools can surface dependencies
+        wrapper._required_formulas = tuple(formula_ids)
+        return wrapper
+    return decorator
+
 
 # ---------------------------------------------------------------------------
 # Module-level singleton

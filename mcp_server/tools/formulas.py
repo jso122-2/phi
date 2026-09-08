@@ -1,10 +1,12 @@
 """
-mcp_server.tools.formulas — formula_call and formula_inspect MCP tools.
+mcp_server.tools.formulas — formula_call, formula_inspect, and
+                             formula_health_check MCP tools.
 
-Exposes the FormulaRegistry as two agent-callable MCP tools:
+Exposes the FormulaRegistry as three agent-callable MCP tools:
 
   formula_inspect(formula_id="")  — list all formulas or describe one
   formula_call(formula_id, ...)   — evaluate a formula with variable bindings
+  formula_health_check()          — assert edge scoring formulas are ready
 
 The registry holds 119 vault formulas sourced from formula_dictionary.yaml
 and python_overrides.yaml.  118/119 are callable Python; one (F_COGNITIVE_GRAVITY)
@@ -13,6 +15,7 @@ requires symbolic differentiation and is marked unimplemented.
 Session flow example
 --------------------
   system_status()
+  formula_health_check()                         # assert math is enforced
   formula_inspect()                              # browse the catalogue
   formula_inspect("F_CAIRRN_COMPOSITE")         # see variable names
   formula_call("F_CAIRRN_COMPOSITE",
@@ -147,3 +150,90 @@ def formula_call(
             "formula_id": formula_id,
             "variables":  variables,
         }
+
+
+@mcp.tool()
+@requires_init
+def formula_health_check() -> dict[str, Any]:
+    """
+    Assert that all edge-scoring formulas are present, ready, and callable.
+
+    Runs a live eval of each of the six required edge activation formulas
+    using canonical test inputs and returns a per-formula status table.
+    Raises (returns ok=False with error) if any formula is missing,
+    unimplemented, or raises on evaluation — making the math enforcement
+    explicit and agent-visible.
+
+    This is the canonical "are the formulas enforced as Python logic"
+    diagnostic.  It is not advisory — if it returns ok=False the system
+    is operating with broken or missing math.
+
+    Returns
+    -------
+    dict with:
+        ok              True when all required formulas pass.
+        all_ready       True when every required formula has status="ready".
+        n_required      Number of required edge formulas (6).
+        n_ready         How many passed the live eval.
+        formula_results Per-formula dict: id → {status, result, error}.
+        registry_total  Total formulas in registry.
+        registry_ready  Total ready formulas in registry.
+        error           Top-level error message on unexpected failure.
+    """
+    from graph.edge_scorer import EDGE_FORMULA_IDS
+
+    reg = _get_registry()
+
+    # Canonical test inputs for each formula
+    _test_inputs: dict[str, dict] = {
+        "F_COSINE_SIMILARITY": {"A": [1.0, 0.0], "B": [1.0, 0.0]},
+        "F_JACCARD_AFFINITY":  {"A": ["a", "b"], "B": ["b", "c"]},
+        "F_EDGE_WEIGHT":       {"sim_list": [0.8], "reinforcement_list": [1.0]},
+        "F_RAG_PRIORITY":      {"X_norm": 0.8, "O_N": 1.0, "T_pos": 0.2, "P_risk": 1.0},
+        "F_PATH_COST":         {"Hop_Count": 1, "sim": 0.8},
+        "F_LOCAL_COHERENCE":   {"w_list": [1.0], "sim_list": [0.5], "dist_list": [1.0]},
+    }
+
+    formula_results: dict[str, Any] = {}
+    n_passed = 0
+
+    for fid in EDGE_FORMULA_IDS:
+        entry: dict[str, Any] = {}
+        if fid not in reg:
+            entry["status"] = "missing"
+            entry["error"]  = "formula_id not found in registry"
+            formula_results[fid] = entry
+            continue
+
+        spec = reg.inspect(fid)
+        entry["status"]      = spec.get("status", "unknown")
+        entry["python_expr"] = spec.get("python_expr", "")
+
+        if entry["status"] != "ready":
+            entry["error"] = "formula is not ready (unimplemented or error)"
+            formula_results[fid] = entry
+            continue
+
+        # Live eval with canonical test inputs
+        test_kwargs = _test_inputs.get(fid, {})
+        try:
+            result = reg.call(fid, **test_kwargs)
+            entry["result"]  = round(float(result), 6)
+            entry["test_kwargs"] = test_kwargs
+            n_passed += 1
+        except Exception as exc:  # noqa: BLE001
+            entry["error"]       = str(exc)
+            entry["test_kwargs"] = test_kwargs
+
+        formula_results[fid] = entry
+
+    all_ready = n_passed == len(EDGE_FORMULA_IDS)
+    return {
+        "ok":             all_ready,
+        "all_ready":      all_ready,
+        "n_required":     len(EDGE_FORMULA_IDS),
+        "n_ready":        n_passed,
+        "formula_results": formula_results,
+        "registry_total": len(reg),
+        "registry_ready": len(reg.ready_ids()),
+    }

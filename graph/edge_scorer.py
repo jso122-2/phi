@@ -11,6 +11,20 @@ This is the exclusive math layer for MCP-accessible edge computation.
 Agents use the graph_edge_score MCP tool; internal pipeline imports EdgeScorer
 directly.
 
+Enforcement
+───────────
+  By default EdgeScorer runs in strict mode: if a required formula is not
+  ready in the registry it raises workers.formula_registry.FormulaNotReady
+  immediately rather than silently falling back to ad-hoc Python math.
+
+  The fallback path is available only when strict=False is passed explicitly,
+  which should never happen in production.  Tests that want to exercise the
+  fallback must opt in.
+
+  At module import, validate_edge_formulas() is called so import itself
+  fails fast if the formula YAML is misconfigured — the graph pipeline cannot
+  start in a degraded math state.
+
 Architecture
 ─────────────
   Vault node A  ──┐
@@ -34,9 +48,8 @@ Design contract
     Individual pair scores always go through formula_call.
   • Every EdgeScore carries a formula_trace dict so agents can see which
     formula produced which value and verify correctness.
-  • If the registry fails to load (no YAML, missing PyYAML), EdgeScorer
-    falls back to direct numpy / Python math with a warning — the graph
-    still works, it just loses Notion-driven formula updates.
+  • strict=True (default) raises FormulaNotReady when formulas are absent.
+    strict=False falls back to direct Python math (test/debug only).
 """
 from __future__ import annotations
 
@@ -47,17 +60,70 @@ from typing import Any
 
 import numpy as np
 
+
 # ---------------------------------------------------------------------------
-# FormulaRegistry — lazy import so the module loads even without PyYAML
+# Required formula IDs — these are the edge activation math, not decorations
+# ---------------------------------------------------------------------------
+
+EDGE_FORMULA_IDS: tuple[str, ...] = (
+    "F_COSINE_SIMILARITY",
+    "F_JACCARD_AFFINITY",
+    "F_EDGE_WEIGHT",
+    "F_RAG_PRIORITY",
+    "F_PATH_COST",
+    "F_LOCAL_COHERENCE",
+)
+
+
+# ---------------------------------------------------------------------------
+# FormulaRegistry — accessed by all scorer methods
 # ---------------------------------------------------------------------------
 
 def _registry():
+    """Return the live FormulaRegistry or None (only in non-strict fallback)."""
     try:
         from workers.formula_registry import REGISTRY
         return REGISTRY
     except Exception as exc:  # noqa: BLE001
         print(f"[edge_scorer] registry unavailable: {exc}", file=sys.stderr)
         return None
+
+
+def validate_edge_formulas() -> dict[str, str]:
+    """
+    Check that every EDGE_FORMULA_ID is present and ready in the registry.
+
+    Returns a dict mapping formula_id → "ready" | "missing" | "unimplemented".
+    Raises workers.formula_registry.FormulaNotReady when any required formula
+    is not callable — the system cannot score edges without its math.
+
+    Called at module import so problems surface immediately, not silently at
+    first score call.
+    """
+    from workers.formula_registry import REGISTRY, FormulaNotReady
+
+    report: dict[str, str] = {}
+    missing: list[str] = []
+
+    for fid in EDGE_FORMULA_IDS:
+        if fid not in REGISTRY:
+            report[fid] = "missing"
+            missing.append(fid)
+            continue
+        spec = REGISTRY.inspect(fid)
+        status = spec.get("status", "unknown")
+        report[fid] = status
+        if status != "ready":
+            missing.append(fid)
+
+    if missing:
+        raise FormulaNotReady(
+            f"EdgeScorer cannot start — {len(missing)} required formula(s) are not ready: "
+            + ", ".join(missing)
+            + ". Run sync_notion or fix config/formulas/formula_dictionary.yaml."
+        )
+
+    return report
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +153,7 @@ class EdgeScore:
 
     # Metadata
     formula_trace:    dict[str, Any] = field(default_factory=dict)
-    fallback_used:    bool = False   # True if registry was unavailable
+    fallback_used:    bool = False   # True only in strict=False mode
 
     @property
     def composite(self) -> float:
@@ -110,7 +176,7 @@ class EdgeScore:
 
 
 # ---------------------------------------------------------------------------
-# Pure-Python fallback math (used when registry unavailable)
+# Pure-Python fallback math — only used when strict=False
 # ---------------------------------------------------------------------------
 
 def _fallback_cosine(a: list[float], b: list[float]) -> float:
@@ -136,11 +202,15 @@ class EdgeScorer:
     """
     Formula-driven edge activation scorer.
 
-    All scoring operations delegate to FormulaRegistry.call().
-    Numpy is used only for batch matrix operations in score_corpus().
+    All scoring operations delegate to FormulaRegistry.call() using the
+    formula IDs declared in EDGE_FORMULA_IDS.  This is not a soft dependency:
+    in strict mode (default) any missing or unimplemented formula raises
+    FormulaNotReady immediately.
 
     Parameters
     ----------
+    strict      Enforce formula availability (default True). Set False only
+                in tests that explicitly exercise the fallback path.
     rag_O_N     System complexity denominator for F_RAG_PRIORITY (default 1.0).
     rag_P_risk  Perplexity risk denominator for F_RAG_PRIORITY (default 1.0).
     edge_hop    Default hop count for F_PATH_COST (default 1).
@@ -148,13 +218,44 @@ class EdgeScorer:
 
     def __init__(
         self,
+        strict:     bool  = True,
         rag_O_N:    float = 1.0,
         rag_P_risk: float = 1.0,
         edge_hop:   int   = 1,
     ) -> None:
+        self._strict     = strict
         self._rag_O_N    = rag_O_N
         self._rag_P_risk = rag_P_risk
         self._edge_hop   = edge_hop
+
+        if strict:
+            # Fail immediately if formulas are missing — do not defer to
+            # first scoring call where errors are harder to diagnose.
+            validate_edge_formulas()
+
+    # ── internal helper ──────────────────────────────────────────────────
+
+    def _call(self, formula_id: str, **kwargs) -> float:
+        """
+        Call a formula through the registry.
+
+        In strict mode: raises FormulaNotReady / FormulaNotFound on failure.
+        In non-strict mode: falls back to the _fallback_* functions and logs
+        a warning.  Non-strict is for tests and offline tooling only.
+        """
+        from workers.formula_registry import REGISTRY, FormulaNotReady, FormulaNotFound
+
+        try:
+            return float(REGISTRY.call(formula_id, **kwargs))
+        except (FormulaNotReady, FormulaNotFound):
+            if self._strict:
+                raise
+            # Non-strict: warn and return sentinel so caller can use fallback
+            print(
+                f"[edge_scorer] non-strict: formula {formula_id} not ready, using fallback",
+                file=sys.stderr,
+            )
+            raise  # let the caller decide which fallback to use
 
     # ── individual formula calls ─────────────────────────────────────────
 
@@ -172,14 +273,12 @@ class EdgeScorer:
         la = list(vec_a) if isinstance(vec_a, np.ndarray) else list(vec_a)
         lb = list(vec_b) if isinstance(vec_b, np.ndarray) else list(vec_b)
 
-        reg = _registry()
-        if reg and "F_COSINE_SIMILARITY" in reg:
-            try:
-                return float(reg.call("F_COSINE_SIMILARITY", A=la, B=lb)), False
-            except Exception as exc:  # noqa: BLE001
-                print(f"[edge_scorer] F_COSINE_SIMILARITY: {exc}", file=sys.stderr)
-
-        return _fallback_cosine(la, lb), True
+        try:
+            return self._call("F_COSINE_SIMILARITY", A=la, B=lb), False
+        except Exception:
+            if self._strict:
+                raise
+            return _fallback_cosine(la, lb), True
 
     def jaccard_affinity(
         self,
@@ -187,39 +286,34 @@ class EdgeScorer:
         tags_b: list[str],
     ) -> tuple[float, bool]:
         """Tag set overlap via F_JACCARD_AFFINITY."""
-        reg = _registry()
-        if reg and "F_JACCARD_AFFINITY" in reg:
-            try:
-                return float(reg.call("F_JACCARD_AFFINITY", A=tags_a, B=tags_b)), False
-            except Exception as exc:  # noqa: BLE001
-                print(f"[edge_scorer] F_JACCARD_AFFINITY: {exc}", file=sys.stderr)
-
-        return _fallback_jaccard(tags_a, tags_b), True
+        try:
+            return self._call("F_JACCARD_AFFINITY", A=tags_a, B=tags_b), False
+        except Exception:
+            if self._strict:
+                raise
+            return _fallback_jaccard(tags_a, tags_b), True
 
     def edge_weight(
         self,
-        sim_scores:        list[float],
-        reinforcement:     list[float],
+        sim_scores:    list[float],
+        reinforcement: list[float],
     ) -> tuple[float, bool]:
         """
         Reinforcement-weighted edge activation via F_EDGE_WEIGHT.
 
         sim_scores      List of per-facet cosine similarities.
-        reinforcement   Parallel list of reinforcement multipliers
-                        (e.g. [1.0] for a single-facet pair).
+        reinforcement   Parallel list of reinforcement multipliers.
         """
-        reg = _registry()
-        if reg and "F_EDGE_WEIGHT" in reg:
-            try:
-                return float(reg.call(
-                    "F_EDGE_WEIGHT",
-                    sim_list=sim_scores,
-                    reinforcement_list=reinforcement,
-                )), False
-            except Exception as exc:  # noqa: BLE001
-                print(f"[edge_scorer] F_EDGE_WEIGHT: {exc}", file=sys.stderr)
-
-        return float(sum(s * r for s, r in zip(sim_scores, reinforcement))), True
+        try:
+            return self._call(
+                "F_EDGE_WEIGHT",
+                sim_list=sim_scores,
+                reinforcement_list=reinforcement,
+            ), False
+        except Exception:
+            if self._strict:
+                raise
+            return float(sum(s * r for s, r in zip(sim_scores, reinforcement))), True
 
     def rag_priority(
         self,
@@ -238,24 +332,21 @@ class EdgeScorer:
         O_N      System complexity (default self._rag_O_N).
         P_risk   Perplexity risk tuning lever (default self._rag_P_risk).
         """
-        O_N_   = O_N    if O_N    is not None else self._rag_O_N
+        O_N_    = O_N    if O_N    is not None else self._rag_O_N
         P_risk_ = P_risk if P_risk is not None else self._rag_P_risk
 
-        reg = _registry()
-        if reg and "F_RAG_PRIORITY" in reg:
-            try:
-                return float(reg.call(
-                    "F_RAG_PRIORITY",
-                    X_norm=X_norm,
-                    O_N=max(O_N_, 1e-9),
-                    T_pos=T_pos,
-                    P_risk=max(P_risk_, 1e-9),
-                )), False
-            except Exception as exc:  # noqa: BLE001
-                print(f"[edge_scorer] F_RAG_PRIORITY: {exc}", file=sys.stderr)
-
-        # Fallback: simple blend
-        return float(X_norm - T_pos), True
+        try:
+            return self._call(
+                "F_RAG_PRIORITY",
+                X_norm=X_norm,
+                O_N=max(O_N_, 1e-9),
+                T_pos=T_pos,
+                P_risk=max(P_risk_, 1e-9),
+            ), False
+        except Exception:
+            if self._strict:
+                raise
+            return float(X_norm - T_pos), True
 
     def path_cost(
         self,
@@ -268,14 +359,12 @@ class EdgeScorer:
         Lower is better — a 1-hop link with sim=0.9 costs 0.1.
         """
         hops = hop_count if hop_count is not None else self._edge_hop
-        reg  = _registry()
-        if reg and "F_PATH_COST" in reg:
-            try:
-                return float(reg.call("F_PATH_COST", Hop_Count=hops, sim=sim)), False
-            except Exception as exc:  # noqa: BLE001
-                print(f"[edge_scorer] F_PATH_COST: {exc}", file=sys.stderr)
-
-        return float(hops * (1.0 - sim)), True
+        try:
+            return self._call("F_PATH_COST", Hop_Count=hops, sim=sim), False
+        except Exception:
+            if self._strict:
+                raise
+            return float(hops * (1.0 - sim)), True
 
     def local_coherence(
         self,
@@ -288,23 +377,21 @@ class EdgeScorer:
 
         C_i = Σ w_ij · sim_ij / dist_ij
         """
-        reg = _registry()
-        if reg and "F_LOCAL_COHERENCE" in reg:
-            try:
-                return float(reg.call(
-                    "F_LOCAL_COHERENCE",
-                    w_list=w_list,
-                    sim_list=sim_list,
-                    dist_list=dist_list,
-                )), False
-            except Exception as exc:  # noqa: BLE001
-                print(f"[edge_scorer] F_LOCAL_COHERENCE: {exc}", file=sys.stderr)
-
-        total = sum(
-            w * s / max(d, 1e-9)
-            for w, s, d in zip(w_list, sim_list, dist_list)
-        )
-        return float(total), True
+        try:
+            return self._call(
+                "F_LOCAL_COHERENCE",
+                w_list=w_list,
+                sim_list=sim_list,
+                dist_list=dist_list,
+            ), False
+        except Exception:
+            if self._strict:
+                raise
+            total = sum(
+                w * s / max(d, 1e-9)
+                for w, s, d in zip(w_list, sim_list, dist_list)
+            )
+            return float(total), True
 
     # ── full pair scoring ────────────────────────────────────────────────
 
@@ -321,42 +408,36 @@ class EdgeScorer:
         """
         Compute a full formula-traced EdgeScore between two vault nodes.
 
+        All five formula calls go through the registry.  In strict mode any
+        missing formula surfaces as FormulaNotReady here, not as a silent
+        wrong answer.
+
         Parameters
         ----------
         stem_a / stem_b   Node stems (used as labels only).
         vec_a / vec_b     Embedding vectors (L2-normalised preferred).
         tags_a / tags_b   Tag lists for Jaccard affinity.
         hop_count         Graph distance for path cost.
-
-        Returns an EdgeScore with formula_trace containing every
-        formula_id → value pair used in the computation.
         """
         trace:    dict[str, Any] = {}
         fallback: bool           = False
 
-        # 1. Cosine similarity
         cos, fb = self.cosine_sim(vec_a, vec_b)
         trace["F_COSINE_SIMILARITY"] = round(cos, 6)
         fallback = fallback or fb
 
-        # 2. Tag set Jaccard affinity
         jac, fb = self.jaccard_affinity(list(tags_a), list(tags_b))
         trace["F_JACCARD_AFFINITY"] = round(jac, 6)
         fallback = fallback or fb
 
-        # 3. Reinforced edge weight
-        #    Treat cosine as the primary sim-facet; Jaccard as reinforcement.
         ew, fb = self.edge_weight([cos], [jac + 1.0])
         trace["F_EDGE_WEIGHT"] = round(ew, 6)
         fallback = fallback or fb
 
-        # 4. RAG priority
-        #    X_norm = cosine_sim, T_pos = 1 - jaccard (penalty for tag distance)
         rp, fb = self.rag_priority(X_norm=cos, T_pos=1.0 - jac)
         trace["F_RAG_PRIORITY"] = round(rp, 6)
         fallback = fallback or fb
 
-        # 5. Path cost
         pc, fb = self.path_cost(sim=cos, hop_count=hop_count)
         trace["F_PATH_COST"] = round(pc, 6)
         fallback = fallback or fb
@@ -394,17 +475,15 @@ class EdgeScorer:
         Per-pair step: F_JACCARD_AFFINITY, F_EDGE_WEIGHT, F_RAG_PRIORITY
                        through the registry.
 
-        Returns a sorted list of (rag_priority, stem, EdgeScore),
-        highest priority first, filtered by threshold and top_k.
+        Returns sorted (rag_priority, stem, EdgeScore), highest first.
         """
         exclude = exclude or set()
 
-        # Batch cosine via numpy (speed) — vectors are L2-normalised
         target_norm = target_vec / (np.linalg.norm(target_vec) + 1e-12)
         corp_norms  = corpus_vecs / (
             np.linalg.norm(corpus_vecs, axis=1, keepdims=True) + 1e-12
         )
-        raw_sims: np.ndarray = corp_norms @ target_norm  # (n,)
+        raw_sims: np.ndarray = corp_norms @ target_norm
 
         results: list[tuple[float, str, EdgeScore]] = []
         for i, (stem, tags, cos_raw) in enumerate(
@@ -416,7 +495,6 @@ class EdgeScorer:
             if cos < threshold:
                 continue
 
-            # Per-pair formula computation
             jac, _ = self.jaccard_affinity(target_tags, tags)
             ew,  _ = self.edge_weight([cos], [jac + 1.0])
             rp,  _ = self.rag_priority(X_norm=cos, T_pos=1.0 - jac)
@@ -445,7 +523,7 @@ class EdgeScorer:
 
 
 # ---------------------------------------------------------------------------
-# Module singleton
+# Module singleton — strict=True: import fails if formulas are misconfigured
 # ---------------------------------------------------------------------------
 
-SCORER = EdgeScorer()
+SCORER = EdgeScorer(strict=True)

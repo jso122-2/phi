@@ -39,7 +39,37 @@ def _raw_init_check() -> dict[str, Any]:
             results[f"import_error_{module}"] = str(exc)
     results["imports"] = import_ok
     results["imports_ok"] = all(import_ok.values())
-    results["ready"] = results["python_ok"] and results["packages_ok"] and results["imports_ok"]
+
+    # Formula registry health — edge scoring math must be callable at startup.
+    formula_status: dict[str, str] = {}
+    formula_ok = False
+    try:
+        from workers.formula_registry import REGISTRY
+        from graph.edge_scorer import EDGE_FORMULA_IDS
+        n_ready = 0
+        for fid in EDGE_FORMULA_IDS:
+            if fid in REGISTRY:
+                spec = REGISTRY.inspect(fid)
+                st = spec.get("status", "unknown")
+                formula_status[fid] = st
+                if st == "ready":
+                    n_ready += 1
+            else:
+                formula_status[fid] = "missing"
+        formula_ok = n_ready == len(EDGE_FORMULA_IDS)
+        results["formula_registry_total"] = len(REGISTRY)
+        results["formula_registry_ready"]  = len(REGISTRY.ready_ids())
+    except Exception as exc:
+        results["formula_registry_error"] = str(exc)
+    results["formula_status"] = formula_status
+    results["formula_ok"]     = formula_ok
+
+    results["ready"] = (
+        results["python_ok"]
+        and results["packages_ok"]
+        and results["imports_ok"]
+        and formula_ok
+    )
     return results
 
 
