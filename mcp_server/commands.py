@@ -325,16 +325,6 @@ SPECS: tuple[CommandSpec, ...] = (
          "Session harmonic trajectory + BMAD pressure signals.", init_free=True,
          optional=("tail",), types={"tail": "int"}),
 
-    # -- notion reservoir ----------------------------------------------------
-    _mcp("notion-tick", "notion_reservoir_tick", _NTN,
-         "Fire a Notion Reservoir tick: write pure edges + update Scores.",
-         optional=("shards", "note"),
-         bool_flags=("dry_run",),
-         defaults={"dry_run": False}),
-    _mcp("notion-state", "notion_reservoir_state", _NTN,
-         "Show current Notion Reservoir shard registry + token status.",
-         init_free=True),
-
     # -- umbrellas + workflow modes ----------------------------------------
     _disp("do", "Mutate — sim, inject, commit, enqueue, …"),
     _mcp("talk",    "agent_context", _CTX, "Strategic discussion — align before building.",
@@ -402,7 +392,6 @@ READ_SUBS: Final[dict[str, str]] = {
     "audit": "code-audit",
     "context": "context-state",
     "vault-store": "vault-store",
-    "notion-state": "notion-state",
 }
 
 # Mutate umbrella: /do <sub> → catalog slash. Values must exist in CATALOG.
@@ -448,7 +437,6 @@ DO_SUBS: Final[dict[str, str]] = {
     "10": "10",
     "vault-project": "vault-project",
     "vault-migrate": "vault-migrate",
-    "notion-tick": "notion-tick",
 }
 
 _HELP_TOKS: Final[frozenset[str]] = frozenset({"help", "--help", "--list", "subs", "subcommands"})

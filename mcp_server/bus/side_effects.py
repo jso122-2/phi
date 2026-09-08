@@ -6,18 +6,20 @@ from typing import Any
 from mcp_server.bus.client import save_job
 
 
-def _notion_tick_async(shards: list[str], note: str = "") -> None:
+def _notion_tick_async(shards: list[str], note: str = "", register: str = "") -> None:
     """
-    Fire a Notion Reservoir tick for the given shards via the singleton bus.
+    Fire a Notion Reservoir tick for the given shards via the singleton bus,
+    then immediately queue a notion.traverse for the same shards.
 
-    Fire-and-forget: submits the bus task and returns immediately.  The tick
-    increments Qe/Ta in Notion so the Reservoir's stateful identity scores
-    (Ns1, Ns2, Classification) update correctly across sessions.
+    Fire-and-forget: submits both tasks and returns immediately.
 
-    The SESSION_TOKEN (stamped at gate-open) is embedded in the note so every
-    Notion edge is traceable back to the session that generated it.  This is
-    the "shallow root / calcium identity" linkage — the Reservoir's edge graph
-    becomes a temporal map of which cognitive domains fired in which sessions.
+    The tick increments Qe/Ta in Notion so the Reservoir's stateful identity
+    scores (Ns1, Ns2, Classification) update correctly across sessions.
+    The traverse queries adjacent edges and caches the result so the next
+    PSSPPS cycle can pulse those hubs into the harmonic ring.
+
+    The SESSION_TOKEN (stamped at gate-open) is embedded in the tick note so
+    every Notion edge is traceable back to the session that generated it.
 
     Called from _apply() when a PSSPPS result carries notion_tick_shards.
     Silent on any bus/token failure — the MCP session must not block on Notion.
@@ -33,12 +35,62 @@ def _notion_tick_async(shards: list[str], note: str = "") -> None:
         # Prefix note with session token for Notion edge traceability
         token_prefix = f"[{SESSION_TOKEN}] " if SESSION_TOKEN else ""
         full_note = f"{token_prefix}{note[:100]}" if note else (token_prefix.rstrip())
+        shards_str = ",".join(shards)
 
         client.submit("notion.tick", {
-            "shards":  ",".join(shards),
+            "shards":  shards_str,
             "note":    full_note[:120],
             "dry_run": False,
         })
+
+        # Follow-up traversal: fetch adjacent edges for the same shards so the
+        # next hub-pulse cycle has fresh context without a blocking API call.
+        client.submit("notion.traverse", {
+            "shards":   shards_str,
+            "register": register,
+            "top_n":    2,
+        })
+    except Exception:
+        pass
+
+
+def _apply_notion_traversal(result: dict) -> None:
+    """
+    Apply side-effects from a completed notion.traverse result.
+
+    Reads the adjacent shard list from the traversal and pulses each
+    adjacent hub into the harmonic ring proportionally to its classification:
+      - load-bearing / informationally-live → strong pulse (0.15)
+      - access-outlier / cold-annotated      → gentle pulse (0.05)
+      - drain-candidate / unknown            → skip
+
+    This feeds traversal context back into the harmonic ring so the next
+    PSSPPS call's perspective scores naturally favour documents aligned with
+    the adjacent shards — the hyphae layer becoming ambient context.
+    """
+    try:
+        from mcp_server._state import _harmonic_index
+        from sims.harmonic import HUB_SHARD_MAP
+
+        if _harmonic_index is None:
+            return
+
+        for traversal in result.get("traversals", []):
+            for adj in traversal.get("adjacent", []):
+                hub = adj.get("hub", "")
+                cls = adj.get("classification", "unknown")
+                if not hub or hub not in HUB_SHARD_MAP:
+                    continue
+                if cls in ("load-bearing", "informationally-live"):
+                    pulse = 0.15
+                elif cls in ("access-outlier", "cold-annotated"):
+                    pulse = 0.05
+                else:
+                    continue
+                _harmonic_index.inject_from_hub(hub, value=pulse)
+
+        if result.get("traversals"):
+            _harmonic_index.propagate(steps=3, mode="local")
     except Exception:
         pass
 
@@ -116,6 +168,19 @@ def _apply(result: dict[str, Any]) -> None:
             result["git_track"] = _graph_track_sync()
         except Exception as exc:
             result["git_track"] = {"error": str(exc)}
+        # Auto-fire Notion Reservoir tick for the committed hub's shard.
+        # Runs async via the bus so it never blocks the commit response.
+        try:
+            from mcp_server.tools.notion_reservoir import hub_to_shard
+            from mcp_server.bus.client import get_client
+            shard = hub_to_shard(hub_name) if hub_name else None
+            if shard:
+                client = get_client()
+                if client is not None:
+                    client.submit("notion.tick", {"shards": shard})
+                    _ledger_record("side_effect:notion_tick")
+        except Exception:
+            pass
 
     fusion = result.get("topology_fusion")
     if isinstance(fusion, dict) and fusion.get("apply"):
@@ -185,8 +250,16 @@ def _apply(result: dict[str, Any]) -> None:
     elif pulse_hubs or pulse_home or result.get("touch_commit"):
         _vault_hub.push_all(harmonic=_harmonic_index.state())
 
-    # Notion Reservoir tick — fired when PSSPPS retrieval is useful.
-    # Uses the singleton bus so the write is async and never blocks tool returns.
+    # Notion Reservoir tick + traversal — fired when PSSPPS retrieval is useful.
+    # tick:     writes pure edges + updates Scores (Qe, Ta, Ec, Ns1-3, Classification)
+    # traverse: queues adjacent edge fetch so next cycle has fresh context
+    # Both are fire-and-forget via the singleton bus.
     notion_shards = result.get("notion_tick_shards")
     if notion_shards and isinstance(notion_shards, list) and len(notion_shards) > 0:
-        _notion_tick_async(notion_shards, result.get("notion_tick_note", ""))
+        register = result.get("notion_register", "")
+        _notion_tick_async(notion_shards, result.get("notion_tick_note", ""), register)
+
+    # Apply traversal side-effects when a notion.traverse task completes.
+    # Pulses adjacent hubs into the harmonic ring (classification-gated).
+    if result.get("notion_traversal_result"):
+        _apply_notion_traversal(result)
