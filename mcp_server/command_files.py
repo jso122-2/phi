@@ -40,6 +40,9 @@ PALETTE_SLASHES: tuple[str, ...] = (
     "audit",
 )
 
+PLUGIN_HOOKS: tuple[str, ...] = ("cloud_agent_hook.py",)
+"""Python hook plugin files managed under .cursor/hooks/ by this module."""
+
 # Extra contract referenced by agent-context.md (cairrn is MCP, not a workflow slash).
 EXTRA_CONTRACTS: tuple[str, ...] = ("cairrn",)
 
@@ -364,6 +367,143 @@ python -m mcp_server.command_files
 """
 
 
+def _tool_calls_mdc() -> str:
+    init_free = sorted([
+        "init_check", "system_status", "list_hooks", "register_hook",
+        "dom_queue_state", "graph_status", "graph_clean", "graph_nest",
+        "graph_track_state", "forecast_state", "bus_poll", "bus_status",
+        "run_command", "list_commands",
+    ])
+    init_free_block = ", ".join(f"`{t}`" for t in init_free)
+    return f"""---
+description: >
+  Tool call system — hook chain, session gate, DOM houses, plugin extension
+  points.  Read before making tool calls or adding hooks.
+alwaysApply: false
+globs:
+  - mcp_server/**/*.py
+  - .cursor/hooks/**
+---
+
+# Tool call system
+
+Every call to a `spotify-rip` MCP tool passes through three layers in order:
+
+```
+1. Session gate      — block if init not done (init-free tools bypass this)
+2. Pre-hook chain    — ordered list of validators; any can raise HookViolation
+3. DOM house gate    — serialising BMAD lock; one house per workflow mode
+```
+
+## Session gate
+
+Tools that require an open session: everything **not** in the init-free set.
+Call `init_check()` or `system_status()` first to open the gate.
+
+Init-free tools (no session required): {init_free_block}
+
+The gate contract hash is returned by `init_check` and `system_status` in the
+`gate_contract_hash` field — use it to verify the gate has not been bypassed.
+
+## Pre-hook chain (`mcp_server/hooks.py`)
+
+An append-only registry of hook functions.  Every function runs before the
+tool body.  Raise `HookViolation` to abort.
+
+**Built-in base hooks (immutable after `_seal_base()`):**
+
+| Hook | Purpose |
+|---|---|
+| `audit_log` | Log every tool call name + arg keys to stderr |
+| `nan_guard` | Reject float args containing NaN or Inf |
+| `param_bounds_guard` | Enforce safe bounds on lr, steps, alpha, value, … |
+
+**Session hooks (registered at gate-open by `_startup_init`):**
+
+| Hook | Purpose |
+|---|---|
+| `psspps_context` | Stream PSSPPS background signal; emit notification when ready |
+| `code_change_guard` | Mandate open gate + non-empty fields for graph writes |
+| `harmonic_guard` | Validate shard_index, hub_name, propagation mode |
+| `cairrn_guard` | Validate CAIRRN hub names |
+| `phi_action_guard` | Validate phi action kinds |
+| `sim_guard` | Clamp x0 to safe range |
+| `temporal_graph_guard` | Validate temporal record inputs |
+| `search_guard` | Require non-empty query |
+| `command_dispatch` | Parse + validate run_command slash strings |
+
+**Cloud-agent default hooks (loaded from `.cursor/hooks/cloud_agent_hook.py`):**
+
+| Hook | Purpose |
+|---|---|
+| `cloud_agent_run_limit` | Abort after N calls (SPOTIFY_RIP_SESSION_CALL_LIMIT, 0 = off) |
+| `cloud_agent_tag_guard` | Reject empty / non-string `run_command` arguments |
+| `cloud_agent_read_only` | Block mutating tools when SPOTIFY_RIP_READ_ONLY=1 |
+
+## Hook plugins (`.cursor/hooks/`)
+
+Any Python file in `.cursor/hooks/` that ends in `_hook.py` and exposes a
+`register_plugins(registry)` function is auto-loaded at startup.
+
+```python
+# .cursor/hooks/my_hook.py
+def register_plugins(registry):
+    from mcp_server.hooks import HookViolation
+
+    def my_guard(tool_name: str, kwargs: dict) -> None:
+        if tool_name == "run_tests" and kwargs.get("coverage"):
+            raise HookViolation("Coverage blocked in this environment")
+
+    registry.register(
+        name="my_guard",
+        description="Block coverage in this env",
+        fn=my_guard,
+    )
+```
+
+Disable plugin loading: `SPOTIFY_RIP_DISABLE_CLOUD_AGENT_HOOKS=1`
+
+## DOM Request Queue (`mcp_server/dom_queue.py`)
+
+Tools are serialised into seven BMAD houses.  Concurrent calls to the same
+house queue; calls to different houses proceed in parallel.
+
+| House | Workflow | Key tools |
+|---|---|---|
+| `talk` | `/talk` | `double_well_sim`, `neg_exp_sim`, `sweep_attractors` |
+| `dev` | `/dev` | `run_tests` |
+| `modular` | `/modular` | `harmonic_index_state`, `harmonic_propagate`, `hub_state` |
+| `wire` | `/wire` | `psspps_query`, `find_query` |
+| `edit` | `/edit` | `harmonic_inject`, `hub_inject` |
+| `clean` | `/clean` | `harmonic_reset`, `init_check`, `system_status`, `dom_queue_state` |
+| `graph` | graph ops | `graph_commit`, `graph_ingest`, `graph_link` |
+
+## Inspect and register hooks
+
+```
+/read hooks          → list_hooks()      — full chain state
+/read status         → system_status()   — includes hook_chain_version
+register_hook(name, description)         — add a placeholder slot
+```
+
+## Quick reference
+
+```python
+from mcp_server.hooks import REGISTRY, HookViolation
+
+# Inspect
+print(REGISTRY.state())           # full chain
+print(REGISTRY.version)           # current length
+print(REGISTRY.base_version)      # immutable base count
+
+# Register (idempotent)
+REGISTRY.register("my_hook", "What it does", fn)
+```
+
+Restore command files: `python -m mcp_server.command_files`
+"""
+
+
 def _command_hook_sh() -> str:
     return """#!/usr/bin/env bash
 # Cursor pre-hooks → mcp_server.commands.hook_main
@@ -395,8 +535,17 @@ def planned_paths(root: Path | None = None) -> dict[str, Path]:
         rel = f".cursor/commands/{slash}.md"
         out[rel] = base / rel
     out[".cursor/rules/slash-commands.mdc"] = base / ".cursor/rules/slash-commands.mdc"
+    out[".cursor/rules/tool-calls.mdc"] = base / ".cursor/rules/tool-calls.mdc"
     out[".cursor/hooks/command-hook.sh"] = base / ".cursor/hooks/command-hook.sh"
     return out
+
+
+def _cloud_agent_hook_py() -> str:
+    """Return the canonical text of cloud_agent_hook.py by reading the live file."""
+    src = REPO_ROOT / ".cursor" / "hooks" / "cloud_agent_hook.py"
+    if src.exists():
+        return src.read_text(encoding="utf-8")
+    return ""
 
 
 def render_files() -> dict[str, str]:
@@ -413,6 +562,7 @@ def render_files() -> dict[str, str]:
         spec = CATALOG[slash]
         files[f".cursor/commands/{slash}.md"] = _palette_markdown(spec)
     files[".cursor/rules/slash-commands.mdc"] = _slash_commands_mdc()
+    files[".cursor/rules/tool-calls.mdc"] = _tool_calls_mdc()
     files[".cursor/hooks/command-hook.sh"] = _command_hook_sh()
     return files
 

@@ -120,5 +120,15 @@ def _startup_init() -> None:
             _register_sim_guard()
             _register_temporal_graph_guard()
             _register_command_dispatch()
+            # Auto-load hook plugins from .cursor/hooks/ (idempotent on retrigger)
+            try:
+                from mcp_server.hook_plugins import load_plugins
+                from mcp_server.hooks import REGISTRY as _hook_reg
+                load_plugins(_hook_reg)
+            except Exception as _plug_exc:
+                print(
+                    f"[mcp_server._gate] hook plugin load failed: {_plug_exc}",
+                    file=sys.stderr,
+                )
     except Exception as exc:
         print(f"[mcp_server._gate] startup init failed: {exc}", file=sys.stderr)

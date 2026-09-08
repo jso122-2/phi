@@ -28,7 +28,7 @@ htmlcov/
 .cache/
 
 # Nested Cursor dir — keep local MCP/project metadata ignored.
-# Command palette, slash-command rules, and the command hook are tracked.
+# Command palette, slash-command rules, tool-call rule, and hooks are tracked.
 .cursor/*
 !.cursor/commands/
 !.cursor/commands/**
