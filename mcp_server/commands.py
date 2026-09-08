@@ -390,6 +390,7 @@ READ_SUBS: Final[dict[str, str]] = {
     "audit": "code-audit",
     "context": "context-state",
     "vault-store": "vault-store",
+    "notion": "notion-state",
 }
 
 # Mutate umbrella: /do <sub> → catalog slash. Values must exist in CATALOG.
@@ -435,6 +436,7 @@ DO_SUBS: Final[dict[str, str]] = {
     "10": "10",
     "vault-project": "vault-project",
     "vault-migrate": "vault-migrate",
+    "notion-tick": "notion-tick",
 }
 
 _HELP_TOKS: Final[frozenset[str]] = frozenset({"help", "--help", "--list", "subs", "subcommands"})

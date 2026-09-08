@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "spotify-rip": {
+      "command": "/workspace/.venv/bin/python",
+      "args": ["-m", "mcp_server.server"],
+      "cwd": "/workspace",
+      "env": {
+        "PYTHONPATH": "/workspace"
+      }
+    }
+  }
+}
