@@ -5,7 +5,8 @@
       "args": ["-m", "mcp_server.server"],
       "cwd": "/workspace",
       "env": {
-        "PYTHONPATH": "/workspace"
+        "PYTHONPATH": "/workspace",
+        "NOTION_TOKEN": "${NOTION_TOKEN}"
       }
     }
   }
