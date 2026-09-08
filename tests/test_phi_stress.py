@@ -60,52 +60,69 @@ def d() -> CAIRRNDispatcher:
 
 
 class TestShardIndexWrap:
-    """shard_index=99 silently injects into shard 3 (99 % 8 = 3)."""
+    """BUG-1 fixed: out-of-range shard_index now returns an error instead of silently aliasing.
 
-    def test_out_of_range_index_wraps_silently(self, d):
-        """Inject into shard 99 → actual target is 3 (99 % 8 = 3). No error raised."""
-        before = d._index.shards[3].activation
+    Previous behaviour: index 99 wrapped via ``99 % 8 = 3`` with no error.
+    Fixed behaviour   : error dict returned; shard state unchanged.
+    """
+
+    def test_out_of_range_index_returns_error(self, d):
+        """Inject into shard 99 → error returned, no shard modified."""
+        before = [s.activation for s in d._index.shards]
         action = PhiAction(
             kind=PhiActionKind.SHARD_INJECT,
             payload={"shard_index": 99, "value": 1.0},
         )
         result = d.force_dispatch(action)
-        # No error key in result — dispatcher reports success
-        assert "error" not in result.result
-        assert result.result["injected_shard"] == 99
-        # But the activation actually landed on shard 3
-        assert d._index.shards[3].activation == pytest.approx(before + 1.0)
+        assert result.result.get("error") == "shard_index_out_of_range"
+        assert result.result["shard_index"] == 99
+        assert result.result["valid_range"] == [0, 7]
+        # No shard modified
+        after = [s.activation for s in d._index.shards]
+        assert before == after
 
-    def test_result_lies_about_actual_shard(self, d):
-        """Result contains the caller-supplied index, not the real target — misleading."""
+    def test_out_of_range_16_returns_error(self, d):
+        """shard_index=16 (previously aliased to 0) now returns an error."""
         action = PhiAction(
             kind=PhiActionKind.SHARD_INJECT,
-            payload={"shard_index": 16, "value": 0.5},  # 16 % 8 = 0
+            payload={"shard_index": 16, "value": 0.5},
         )
         result = d.force_dispatch(action)
-        assert result.result["injected_shard"] == 16
-        # Real target was shard 0
-        assert d._index.shards[0].activation > 0.0
+        assert result.result.get("error") == "shard_index_out_of_range"
+        assert d._index.shards[0].activation == pytest.approx(0.0)
 
-    def test_negative_index_also_wraps(self, d):
-        """Negative shard index is also accepted and wraps via Python modulo."""
+    def test_negative_index_returns_error(self, d):
+        """Negative shard_index now returns an error instead of wrapping."""
         action = PhiAction(
             kind=PhiActionKind.SHARD_INJECT,
-            payload={"shard_index": -1, "value": 0.5},  # -1 % 8 = 7
+            payload={"shard_index": -1, "value": 0.5},
         )
-        before = d._index.shards[7].activation
-        d.force_dispatch(action)
-        assert d._index.shards[7].activation == pytest.approx(before + 0.5)
+        result = d.force_dispatch(action)
+        assert result.result.get("error") == "shard_index_out_of_range"
+        assert d._index.shards[7].activation == pytest.approx(0.0)
 
-    def test_large_index_stress(self, d):
-        """1000 injections with indices 0–999 — dispatcher must not raise."""
-        for i in range(1000):
+    def test_in_range_indices_succeed(self, d):
+        """Indices 0–7 still work correctly."""
+        for i in range(8):
+            action = PhiAction(
+                kind=PhiActionKind.SHARD_INJECT,
+                payload={"shard_index": i, "value": 0.1},
+            )
+            result = d.force_dispatch(action)
+            assert "error" not in result.result
+            assert result.result["injected_shard"] == i
+
+    def test_large_index_stress_returns_errors(self, d):
+        """Indices 8–999 all return out-of-range errors — no crash, no aliasing."""
+        for i in range(8, 1000):
             action = PhiAction(
                 kind=PhiActionKind.SHARD_INJECT,
                 payload={"shard_index": i, "value": 0.001},
             )
             result = d.force_dispatch(action)
-            assert "error" not in result.result
+            assert result.result.get("error") == "shard_index_out_of_range", (
+                f"index {i} should return error, got {result.result}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -185,15 +202,27 @@ class TestFlushErrorTransparency:
 
 
 class TestWatchdogAbsent:
-    """make_dispatcher() never attaches a DoubleRouteWatchdog by default.
-    Double-routes go completely undetected unless the caller attaches one."""
+    """make_dispatcher(attach_watchdog=False) contract — watchdog explicitly absent.
 
-    def test_dispatcher_has_no_watchdog_by_default(self, d):
+    BUG-3 is now fixed: make_dispatcher() attaches a DoubleRouteWatchdog by default.
+    These tests use attach_watchdog=False to reproduce the old absent-watchdog
+    scenario and verify behaviour in that explicit opt-out case.
+    """
+
+    def test_dispatcher_has_watchdog_by_default(self, d):
+        """The fixture creates a bare CAIRRNDispatcher (no watchdog)."""
         assert d._dr_watchdog is None
 
-    def test_make_dispatcher_no_watchdog(self):
+    def test_make_dispatcher_attaches_watchdog_by_default(self):
         idx = _make_index()
         disp = make_dispatcher(harmonic_index=idx)
+        assert disp._dr_watchdog is not None, (
+            "make_dispatcher() must auto-attach a DoubleRouteWatchdog (BUG-3 fix)"
+        )
+
+    def test_make_dispatcher_no_watchdog_when_opted_out(self):
+        idx = _make_index()
+        disp = make_dispatcher(harmonic_index=idx, attach_watchdog=False)
         assert disp._dr_watchdog is None
 
     def test_double_route_not_counted_without_watchdog(self, d):
@@ -220,6 +249,20 @@ class TestWatchdogAbsent:
             d.force_dispatch(a)
 
         state = watchdog.state()
+        assert state["total_events"] == 1
+
+    def test_make_dispatcher_double_route_recorded_with_default_watchdog(self):
+        """make_dispatcher() default: two fast SHARD_INJECT → watchdog records 1 event."""
+        idx = _make_index()
+        disp = make_dispatcher(harmonic_index=idx, watchdog_window_ms=2000.0)
+        assert disp._dr_watchdog is not None
+        for _ in range(2):
+            a = PhiAction(
+                kind=PhiActionKind.SHARD_INJECT,
+                payload={"shard_index": 0, "value": 0.1},
+            )
+            disp.force_dispatch(a)
+        state = disp._dr_watchdog.state()
         assert state["total_events"] == 1
 
 

@@ -1277,6 +1277,13 @@ class CAIRRNDispatcher:
 
     def _exec_shard_inject(self, p: dict) -> dict:
         shard_index = int(p.get("shard_index", 0))
+        n_shards = len(self._index.shards)
+        if shard_index < 0 or shard_index >= n_shards:
+            return {
+                "error": "shard_index_out_of_range",
+                "shard_index": shard_index,
+                "valid_range": [0, n_shards - 1],
+            }
         value = float(p.get("value", 1.0))
         self._index.inject(shard_index, value)
         return {"injected_shard": shard_index, "value": value}
@@ -1528,26 +1535,38 @@ def make_dispatcher(
     forest_floor: Optional[Any] = None,
     tau: float = 10.0,
     threshold: float = COHERENCE_THRESHOLD,
+    watchdog_window_ms: float = 450.0,
+    attach_watchdog: bool = True,
+    race_watcher: Optional[Any] = None,
 ) -> CAIRRNDispatcher:
     """
     Construct a CAIRRNDispatcher with the given subsystem references.
 
     Parameters
     ----------
-    harmonic_index : live HarmonicIndex (required — gate signal + inject target)
-    session        : PhiTracerSession — needed for CLIP and SHUFFLE_* actions
-    shuffle        : CAIRRNPrefeedShuffle — needed for SHUFFLE_* actions
-    temporal_index : TemporalShardIndex — needed for TEMPORAL_REC actions
-    substrate      : MycelialSubstrate — runs mycelial tick on every gate-open
-    hot_loader     : CAIRRNHotLoader — speculative prefetch cache for LOAD_TRACK
-                     and HOVER_PREFETCH (and any registered hot entries)
-    forest_floor   : ForestFloor — when attached, CODE ticks echo into the floor
-                     bridge and _read_code_activation() reads directly from the
-                     floor rather than from harmonic_index shards
-    tau            : coherence decay constant (default 10.0)
-    threshold      : gate-open threshold (default COHERENCE_THRESHOLD ≈ 0.5671)
+    harmonic_index    : live HarmonicIndex (required — gate signal + inject target)
+    session           : PhiTracerSession — needed for CLIP and SHUFFLE_* actions
+    shuffle           : CAIRRNPrefeedShuffle — needed for SHUFFLE_* actions
+    temporal_index    : TemporalShardIndex — needed for TEMPORAL_REC actions
+    substrate         : MycelialSubstrate — runs mycelial tick on every gate-open
+    hot_loader        : CAIRRNHotLoader — speculative prefetch cache for LOAD_TRACK
+                        and HOVER_PREFETCH (and any registered hot entries)
+    forest_floor      : ForestFloor — when attached, CODE ticks echo into the floor
+                        bridge and _read_code_activation() reads directly from the
+                        floor rather than from harmonic_index shards
+    tau               : coherence decay constant (default 10.0)
+    threshold         : gate-open threshold (default COHERENCE_THRESHOLD ≈ 0.5671)
+    watchdog_window_ms: DOUBLE_ROUTE detection window in ms (default 450.0)
+    attach_watchdog   : auto-attach a DoubleRouteWatchdog (default True).
+                        Set False only in unit tests that check the absent-watchdog
+                        contract directly (TestWatchdogAbsent).
+    race_watcher      : optional PhiRaceWatcher — when provided, the newly created
+                        DoubleRouteWatchdog is wired back via
+                        race_watcher.attach_dr_watchdog() so DOUBLE_ADVANCE events
+                        from the playback engine are unified with dispatcher
+                        DOUBLE_ROUTE events in a single watchdog state.
     """
-    return CAIRRNDispatcher(
+    dispatcher = CAIRRNDispatcher(
         harmonic_index=harmonic_index,
         session=session,
         shuffle=shuffle,
@@ -1558,3 +1577,12 @@ def make_dispatcher(
         tau=tau,
         threshold=threshold,
     )
+    if attach_watchdog:
+        watchdog = DoubleRouteWatchdog(dispatcher, window_ms=watchdog_window_ms)
+        dispatcher.attach_double_route_watchdog(watchdog)
+        if race_watcher is not None:
+            try:
+                race_watcher.attach_dr_watchdog(watchdog)
+            except Exception:
+                pass
+    return dispatcher
