@@ -51,6 +51,7 @@ Each shard file carries its live Shards-DB scoring row (Idx, Qe, Si, Ss, Et, Ta,
 | `10-notion-data-stream-score-formalisation.md` | **The longest file.** Ec/Ns1/Ns2/Ns3 formalisation, full corpus restatement, the three handwritten sheets transcribed, Layers 6–8 (semantic field integration, math-based edges, edge state definition). |
 | `11-reservoir-maths-database.md` | All 5 rows of the `reservoir-maths` DB — equation, variables, Python and SQL reference implementations for relevance, drift, resonance, valence, traversal. |
 | `12-shards-database-formulas.md` | Shards DB formula properties (Ec, Ns1, Ns2, Ns3, R_node, Si_delta), input field definitions, and live row state. |
+| `13-phi-codebase-formalisation.md` | **On-disk phi/, not in the Notion export.** Session-fit C_E, buoyancy, helm floor, novelty half-life, ash yield, TP-RAR keep/fill, Cc, dragon D4_A/B, arc continuation, song D1–D4, Euler χ, T_B, E_coh. |
 
 ---
 
@@ -58,3 +59,4 @@ Each shard file carries its live Shards-DB scoring row (Idx, Qe, Si, Ss, Et, Ta,
 
 - The two `Formulas 12/13-12-25` image sets (handwritten sheets) — Notion's signed image URLs expire and the connector only pulls text. The typed transcriptions are in `01` Layer 9 and `10` "New maths — handwritten sheets".
 - Entries, Edges and Scores database rows — these are running state, not maths or skills. Say the word if you want them too.
+- Live Notion pages after 2026-09-07 — this tree is a snapshot. Phi Layer 10 was formalised from local `phi/` because the connector was not available and the export had no phi scoring pages.
