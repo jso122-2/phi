@@ -1,0 +1,88 @@
+# config/formulas/formula_enforcement.yaml
+#
+# Enforcement contract for agent formula calls via the MCP.
+#
+# Each rule defines the mathematical dependency order that must be respected
+# within a single agent session (prompt cycle).  The gate blocks a formula
+# call if its listed preconditions have not already been satisfied in this
+# session.
+#
+# This is not an arbitrary access policy — the preconditions reflect the
+# actual mathematical structure:
+#
+#   F_EDGE_WEIGHT   = Σ(sim × reinforcement)       → sim must exist first
+#   F_RAG_PRIORITY  = X_norm/O_N − T_pos/P_risk    → X_norm IS cosine sim
+#   F_PATH_COST     = hop_count × (1 − sim)        → sim must exist first
+#   F_LOCAL_COHERENCE = Σ w·sim/dist               → sim + Jaccard first
+#
+# Rules reset at each agent session boundary (each prompt cycle / MCP spawn).
+#
+# Format:
+#   formula_id   : the formula being guarded
+#   requires     : list of formula_ids that must have been called first
+#   message      : human-readable error shown to the agent when blocked
+#   output_finite: true = result must be a finite float (NaN/Inf are errors)
+#
+# Formulas with no requirements are always callable as entry points.
+
+rules:
+  # ── entry points (no preconditions) ──────────────────────────────────────
+
+  - formula_id: F_COSINE_SIMILARITY
+    requires: []
+    message: ""
+    output_finite: true
+
+  - formula_id: F_JACCARD_AFFINITY
+    requires: []
+    message: ""
+    output_finite: true
+
+  # ── requires cosine similarity ────────────────────────────────────────────
+  # An edge weight is a reinforced sum of similarity scores.
+  # The similarity score (F_COSINE_SIMILARITY) must exist before it can be
+  # reinforced.
+
+  - formula_id: F_EDGE_WEIGHT
+    requires:
+      - F_COSINE_SIMILARITY
+    message: >-
+      F_EDGE_WEIGHT = Σ(sim × reinforcement). Call F_COSINE_SIMILARITY first
+      to establish the similarity scores that will be reinforced.
+    output_finite: true
+
+  # RAG priority formula: P_sps = X_norm/O_N − T_pos/P_risk.
+  # X_norm is the cosine-similarity-derived semantic awareness score.
+  # Calling F_COSINE_SIMILARITY first makes the X_norm binding explicit.
+
+  - formula_id: F_RAG_PRIORITY
+    requires:
+      - F_COSINE_SIMILARITY
+    message: >-
+      F_RAG_PRIORITY uses X_norm (semantic awareness) derived from cosine
+      similarity. Call F_COSINE_SIMILARITY first to compute X_norm.
+    output_finite: true
+
+  # Path cost = hop_count × (1 − sim). The sim operand must be computed
+  # before the cost can be calculated.
+
+  - formula_id: F_PATH_COST
+    requires:
+      - F_COSINE_SIMILARITY
+    message: >-
+      F_PATH_COST = Hop_Count × (1 − sim). Call F_COSINE_SIMILARITY first
+      to establish the similarity value.
+    output_finite: true
+
+  # ── requires both cosine similarity AND Jaccard affinity ─────────────────
+  # Local coherence combines per-edge sim with tag-set overlap (Jaccard).
+  # Both components must be computed before coherence can be aggregated.
+
+  - formula_id: F_LOCAL_COHERENCE
+    requires:
+      - F_COSINE_SIMILARITY
+      - F_JACCARD_AFFINITY
+    message: >-
+      F_LOCAL_COHERENCE = Σ w·sim/dist. Call F_COSINE_SIMILARITY and
+      F_JACCARD_AFFINITY first to establish the sim and weight inputs.
+    output_finite: true

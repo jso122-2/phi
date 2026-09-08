@@ -130,6 +130,17 @@ def formula_call(
     try:
         result = reg.call(formula_id, **variables)
         spec   = reg.inspect(formula_id)
+
+        # Post-call: validate output contract, then record in ledger.
+        # The gate also acts as a post-call validator (finite check) and
+        # records the result so successor formulas can proceed.
+        try:
+            from mcp_server.formula_gate import GATE
+            GATE.validate_result(formula_id, float(result))
+            GATE.record(formula_id, float(result))
+        except Exception:  # noqa: BLE001
+            pass  # gate import/validate failure must not suppress a good result
+
         return {
             "ok":         True,
             "result":     result,
@@ -236,4 +247,40 @@ def formula_health_check() -> dict[str, Any]:
         "formula_results": formula_results,
         "registry_total": len(reg),
         "registry_ready": len(reg.ready_ids()),
+    }
+
+
+@mcp.tool()
+@requires_init
+def formula_session_state() -> dict[str, Any]:
+    """
+    Show which formulas are callable right now in this session.
+
+    Returns a per-formula table driven by the enforcement contract and the
+    session ledger.  Use this to know what you can call before trying it.
+
+    For each formula in the enforcement contract:
+        callable        True if all preconditions have been met.
+        called          True if this formula has already run this session.
+        last_result     Numeric result from the most recent call (or null).
+        missing_first   List of formula_ids that must be called before this one.
+
+    Formulas not listed in the contract have no restrictions and are always
+    callable via formula_call.
+
+    Returns
+    -------
+    dict with:
+        ok              Always True.
+        session_state   formula_id → {callable, called, last_result, missing_first}
+        n_called        Number of formulas called so far this session.
+    """
+    from mcp_server.formula_gate import GATE
+
+    state = GATE.session_state()
+    n_called = sum(1 for v in state.values() if v["called"])
+    return {
+        "ok":            True,
+        "session_state": state,
+        "n_called":      n_called,
     }
