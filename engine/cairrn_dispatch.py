@@ -6,9 +6,10 @@ Architecture
 Every phi operation is a PhiAction that enters a priority queue.
 The dispatcher owns the coherence gate.  On each step():
 
-    coherence = exp(−steps_since_tick / τ)
+    coherence = min(1 − exp(−steps_since_tick / τ),  temporal.ana_chi_coherence())
+                ↑ exp-decay builds 0→1 after each gate-open   ↑ Ana-Chi joint gate
 
-    GATE CLOSED (coherence < 0.5671)          GATE OPEN (coherence ≥ 0.5671)
+    GATE CLOSED (coherence < W(1) ≈ 0.5671)   GATE OPEN (coherence ≥ 0.5671)
          │                                           │
          ▼                                           ▼
     prefeed(head)                           dequeue by priority
@@ -370,6 +371,10 @@ class DoubleRouteWatchdog:
 
         self._last_exec: dict[str, float] = {}        # kind.value → monotonic ts
         self._events: list[DoubleRouteEvent] = []
+        # euler-bound suppression — kind.value → suppress_until monotonic ts.
+        # When a race is scored inside the Euler boundary (coherence < W(1)),
+        # further dispatches of that kind are blocked for one window period.
+        self._suppressed: dict[str, float] = {}
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------
@@ -423,6 +428,24 @@ class DoubleRouteWatchdog:
             self._events.append(event)
             if len(self._events) > self._max_events:
                 self._events = self._events[-self._max_events:]
+
+            # Euler-bound suppression: block re-dispatch of this kind for one
+            # window so the coherence gate can recover before the action runs again.
+            if event.euler_bound:
+                self._suppressed[kind_str] = now + self._window
+
+    def is_suppressed(self, kind_str: str) -> bool:
+        """
+        Return True when a previous euler-bound race for this action kind is
+        still within its cooldown window.
+
+        Thread-safe (uses the same lock as observe).  Called from the dispatcher
+        step() inside its own RLock, so this must NOT acquire self._lock to avoid
+        a lock-order deadlock.  The worst case is a stale read — fine for a
+        one-window suppression.
+        """
+        suppress_until = self._suppressed.get(kind_str, 0.0)
+        return time.monotonic() < suppress_until
 
     def state(self) -> dict[str, Any]:
         """Serialisable snapshot — safe to call from any thread."""
@@ -600,7 +623,10 @@ class CAIRRNDispatcher:
                 self._hot_loader.step()
 
             code_act  = self._read_code_activation()
-            coherence = 1.0 - math.exp(-self._steps_since_tick / self._tau)
+            # Use the joint coherence property — binds exp-decay AND temporal
+            # Ana-Chi gate so a burst into COMMANDS/MATH closes dispatch until
+            # hub activity decays back toward HOME (W(1) ≈ 0.5671).
+            coherence = self.coherence
 
             if coherence < self._threshold:
                 # Gate closed — prefeed the head of queue if possible
@@ -627,10 +653,22 @@ class CAIRRNDispatcher:
                 prefeed_was_ready = False
 
                 if self._queue:
-                    action = self._queue.pop(0)
-                    prefeed_was_ready = action.action_id in self._prefeed_cache
-                    exec_result = self._execute(action)
-                    self._prefeed_cache.pop(action.action_id, None)
+                    # Skip any action whose kind is currently euler-suppressed.
+                    # Suppression is set by DoubleRouteWatchdog when a race fires
+                    # below the Euler bound — the kind is deferred until the
+                    # cooldown window expires and coherence can recover.
+                    candidate = self._queue[0]
+                    if (
+                        self._dr_watchdog is not None
+                        and self._dr_watchdog.is_suppressed(candidate.kind.value)
+                    ):
+                        # Defer: skip without executing; try again next step.
+                        action = None
+                    else:
+                        action = self._queue.pop(0)
+                        prefeed_was_ready = action.action_id in self._prefeed_cache
+                        exec_result = self._execute(action)
+                        self._prefeed_cache.pop(action.action_id, None)
 
                 # Always run the CAIRRN CODE hub step on gate-open to update shards
                 self._run_cairrn_code_tick()
@@ -668,8 +706,8 @@ class CAIRRNDispatcher:
         The double-route watchdog observe() runs after releasing the lock.
         """
         with self._lock:
-            code_act = self._read_code_activation()
-            coherence = 1.0 - math.exp(-self._steps_since_tick / self._tau)
+            code_act  = self._read_code_activation()
+            coherence = self.coherence  # joint Ana-Chi gate, same as step()
             exec_result = self._execute(action)
             result = DispatchResult(
                 gated=True, skipped=False,
@@ -1067,6 +1105,16 @@ class CAIRRNDispatcher:
         )
         self._last_health_horizon = ti_star     # expose for state() inspection
 
+        # Wire M3 → per-shard coherence quality feedback.
+        # When M3 > threshold the shuffle order is misaligned — decay coherence
+        # on the shards that drive the incoherence.  When accepted, all shards
+        # heal.  This closes the loop: coherence state feeds the gate, gate
+        # modulates dispatch, M3 evaluates dispatch quality, M3 updates coherence.
+        try:
+            index.update_coherence_from_m3(m3, threshold=M3_THRESHOLD)
+        except Exception:
+            pass
+
         if m3 <= M3_THRESHOLD:
             self._prefeed_cache[action_id] = "__prefeed_done__"
         # else: action stays at queue head; prefeed retries next step
@@ -1277,6 +1325,13 @@ class CAIRRNDispatcher:
 
     def _exec_shard_inject(self, p: dict) -> dict:
         shard_index = int(p.get("shard_index", 0))
+        n_shards = len(self._index.shards)
+        if shard_index < 0 or shard_index >= n_shards:
+            return {
+                "error": "shard_index_out_of_range",
+                "shard_index": shard_index,
+                "valid_range": [0, n_shards - 1],
+            }
         value = float(p.get("value", 1.0))
         self._index.inject(shard_index, value)
         return {"injected_shard": shard_index, "value": value}
@@ -1528,26 +1583,38 @@ def make_dispatcher(
     forest_floor: Optional[Any] = None,
     tau: float = 10.0,
     threshold: float = COHERENCE_THRESHOLD,
+    watchdog_window_ms: float = 450.0,
+    attach_watchdog: bool = True,
+    race_watcher: Optional[Any] = None,
 ) -> CAIRRNDispatcher:
     """
     Construct a CAIRRNDispatcher with the given subsystem references.
 
     Parameters
     ----------
-    harmonic_index : live HarmonicIndex (required — gate signal + inject target)
-    session        : PhiTracerSession — needed for CLIP and SHUFFLE_* actions
-    shuffle        : CAIRRNPrefeedShuffle — needed for SHUFFLE_* actions
-    temporal_index : TemporalShardIndex — needed for TEMPORAL_REC actions
-    substrate      : MycelialSubstrate — runs mycelial tick on every gate-open
-    hot_loader     : CAIRRNHotLoader — speculative prefetch cache for LOAD_TRACK
-                     and HOVER_PREFETCH (and any registered hot entries)
-    forest_floor   : ForestFloor — when attached, CODE ticks echo into the floor
-                     bridge and _read_code_activation() reads directly from the
-                     floor rather than from harmonic_index shards
-    tau            : coherence decay constant (default 10.0)
-    threshold      : gate-open threshold (default COHERENCE_THRESHOLD ≈ 0.5671)
+    harmonic_index    : live HarmonicIndex (required — gate signal + inject target)
+    session           : PhiTracerSession — needed for CLIP and SHUFFLE_* actions
+    shuffle           : CAIRRNPrefeedShuffle — needed for SHUFFLE_* actions
+    temporal_index    : TemporalShardIndex — needed for TEMPORAL_REC actions
+    substrate         : MycelialSubstrate — runs mycelial tick on every gate-open
+    hot_loader        : CAIRRNHotLoader — speculative prefetch cache for LOAD_TRACK
+                        and HOVER_PREFETCH (and any registered hot entries)
+    forest_floor      : ForestFloor — when attached, CODE ticks echo into the floor
+                        bridge and _read_code_activation() reads directly from the
+                        floor rather than from harmonic_index shards
+    tau               : coherence decay constant (default 10.0)
+    threshold         : gate-open threshold (default COHERENCE_THRESHOLD ≈ 0.5671)
+    watchdog_window_ms: DOUBLE_ROUTE detection window in ms (default 450.0)
+    attach_watchdog   : auto-attach a DoubleRouteWatchdog (default True).
+                        Set False only in unit tests that check the absent-watchdog
+                        contract directly (TestWatchdogAbsent).
+    race_watcher      : optional PhiRaceWatcher — when provided, the newly created
+                        DoubleRouteWatchdog is wired back via
+                        race_watcher.attach_dr_watchdog() so DOUBLE_ADVANCE events
+                        from the playback engine are unified with dispatcher
+                        DOUBLE_ROUTE events in a single watchdog state.
     """
-    return CAIRRNDispatcher(
+    dispatcher = CAIRRNDispatcher(
         harmonic_index=harmonic_index,
         session=session,
         shuffle=shuffle,
@@ -1558,3 +1625,12 @@ def make_dispatcher(
         tau=tau,
         threshold=threshold,
     )
+    if attach_watchdog:
+        watchdog = DoubleRouteWatchdog(dispatcher, window_ms=watchdog_window_ms)
+        dispatcher.attach_double_route_watchdog(watchdog)
+        if race_watcher is not None:
+            try:
+                race_watcher.attach_dr_watchdog(watchdog)
+            except Exception:
+                pass
+    return dispatcher

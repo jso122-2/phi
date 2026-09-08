@@ -294,6 +294,9 @@ SPECS: tuple[CommandSpec, ...] = (
     _mcp("phi-step", "phi_step", _PHI, "One CAIRRN dispatcher clock tick."),
     _mcp("phi-queue", "phi_queue", _PHI, "Inspect phi dispatcher queue + gate."),
     _mcp("phi-flush", "phi_flush", _PHI, "Force-dispatch all queued phi actions."),
+    _mcp("phi-watchdog", "phi_watchdog", _PHI,
+         "Pericles/Euler race-condition watchdog state.",
+         types={"clear": "bool"}),
     _mcp("clip", "gemini_clip", _CLIP, "Clip top-K library tracks for a query.",
          rest="query", types={"top_k": "int", "blend": "float"},
          flag_map={"top-k": "top_k"}),
@@ -304,7 +307,10 @@ SPECS: tuple[CommandSpec, ...] = (
          flag_map={"peek": "peek_ahead"}),
     _mcp("shuffle-state", "shuffle_state", _SHUF, "Inspect shuffle + gate state."),
 
-    # -- bus / forecast / audit --------------------------------------------
+    # -- bus / forecast / session audit ------------------------------------
+    _mcp("session-audit", "session_audit", _SYS,
+         "Runtime MCP call ledger — family breakdown, violations, sequence.",
+         types={"tail": "int"}),
     _mcp("bus-submit", "bus_submit", _BUS, "Enqueue a mmap/celery bus job.",
          positionals=("task",), rest="payload_json"),
     _mcp("bus-poll", "bus_poll", _BUS, "Poll a bus job by id.",

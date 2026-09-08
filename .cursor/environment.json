@@ -1,0 +1,29 @@
+{
+  "name": "phi",
+
+  "install": "cd /workspace && pip install --break-system-packages -e '.[dev]' && pip install --break-system-packages 'mcp>=1.0,<2' networkx scikit-learn",
+
+  "start": "cd /workspace && mkdir -p .runtime/bus && PYTHONPATH=/workspace PYTHONUNBUFFERED=1 python3 -m mcp_server.bus >> .runtime/bus/worker.log 2>&1 &",
+
+  "mcpServers": {
+    "phi": {
+      "type": "stdio",
+      "command": "python3",
+      "args": ["-m", "mcp_server.cloud"],
+      "env": {
+        "PYTHONPATH": "/workspace",
+        "PYTHONUNBUFFERED": "1",
+        "SPOTIFY_RIP_MCP_NAME": "phi",
+        "SPOTIFY_RIP_CLOUD_MCP": "1"
+      }
+    }
+  },
+
+  "mcpServerAllowlist": [
+    {
+      "name": "phi",
+      "command": "python3",
+      "args": ["-m", "mcp_server.cloud"]
+    }
+  ]
+}

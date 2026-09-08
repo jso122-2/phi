@@ -41,6 +41,35 @@ It must be restarted from Cursor settings if `server.py` changes.
 
 ---
 
+## Cloud Agents — `phi` stdio MCP
+
+Cloud Agents do **not** load laptop `~/.cursor/mcp.json`. Vault search is a first-class Cloud MCP, not an ad-hoc Python call.
+
+Attach custom stdio MCP **phi** (dashboard MCP dropdown or API `mcpServers`):
+
+```json
+{
+  "name": "phi",
+  "type": "stdio",
+  "command": "python3",
+  "args": ["-m", "mcp_server.cloud"]
+}
+```
+
+| Tool | What it does |
+|---|---|
+| `find_query` | Pericles `/find` over the vault |
+| `psspps_query` | Perspective RAG |
+| `gemini_clip` / `phi_enqueue` / `phi_queue` | Phi library actions |
+| `phi_watchdog` | Pericles/Euler race-condition watchdog state |
+| `session_audit` | Runtime MCP call ledger — family breakdown, violations, sequence |
+
+`mcp_server.cloud` opens the session gate at spawn. If the mmap/celery worker is absent, `submit_and_maybe_wait` runs the registered bus task **in-process** (`source: "in-process"`).
+
+Repo spec: `.cursor/mcp.json` · `mcp_server/cloud.py`
+
+---
+
 ## Tool catalog
 
 | Tool | MCP name | House | Slash command |

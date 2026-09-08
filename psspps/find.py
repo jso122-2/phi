@@ -82,6 +82,8 @@ class FindCandidate:
     headings: list[str] = field(default_factory=list)
     wikilinks: list[str] = field(default_factory=list)
     snippet: str = ""
+    affinity: list[float] = field(default_factory=list)
+    """8-dim L1-normalised harmonic affinity vector — carried for shard feedback."""
 
 
 @dataclass
@@ -309,6 +311,11 @@ def run_find(
     # equivalent to combined_scores with no gate applied.
     k_scores = sem_gated_blend(sem, persp, alpha=alpha)
 
+    # Coherence tiebreaker: structured × aligned docs get a small lift before
+    # the top-5 cut so they don't lose their slot to equivalent-score noise.
+    max_sem_pre = float(np.max(sem)) if len(sem) > 0 else 0.0
+    k_scores = np.clip(k_scores + 0.05 * coh * max_sem_pre, 0.0, 1.0)
+
     # ---- Top-5 by combined score ------------------------------------------
     n_candidates = min(5, len(docs))
     top5_idx = np.argsort(k_scores)[::-1][:n_candidates]
@@ -343,6 +350,8 @@ def run_find(
             headings=doc["headings"][:5],
             wikilinks=doc["wikilinks"][:8],
             snippet=snippet,
+            # Affinity carried for shard feedback injection.
+            affinity=[round(float(v), 6) for v in affinities[idx]],
         ))
 
     # ---- Re-rank → operator_3 → answer -------------------------------------

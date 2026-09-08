@@ -77,6 +77,19 @@ def init_check() -> dict[str, Any]:
         results["tool_load_errors"] = tool_load_errors
         results["startup_ok"] = startup_ok
         results["init_account"] = _init_account_path()
+
+        # Spawn gate: include session context in the init_check response so
+        # the agent receives live-init.md content directly in the tool result.
+        # emit_spawn_context() was already called eagerly at server startup;
+        # this covers the case where the agent calls init_check() before the
+        # eager emit has fired or when running in a non-cloud context.
+        try:
+            from mcp_server._spawn_gate import emit_spawn_context, spawn_context_dict
+            emit_spawn_context()   # idempotent — no-op if already emitted
+            results["spawn_context"] = spawn_context_dict()
+        except Exception:
+            pass
+
         return results
 
 
@@ -339,6 +352,42 @@ def register_hook(name: str, description: str) -> dict[str, Any]:
             "hook_chain_version": version,
             "chain":            _hook_registry.state(),
         }
+
+
+@mcp.tool()
+def session_audit(tail: int = 50) -> dict[str, Any]:
+    """
+    Return the runtime MCP call ledger for this session.
+
+    Every tool call made since server startup is recorded here with its
+    timestamp, tool name, and family classification
+    (init / search / dispatch / graph / sim / playback / cairrn / harmonic /
+    system / other).  Violations (gate failures, bypass attempts) are flagged.
+
+    Use this to verify that your session is using the canonical MCP tools
+    correctly and in the right sequence.
+
+    Parameters
+    ----------
+    tail : number of recent call records to return (default 50, max 500)
+    """
+    with _dom_queue.gate("session_audit"):
+        from mcp_server._runtime_ledger import LEDGER
+        tail = max(1, min(int(tail), 500))
+        state = LEDGER.state(tail=tail)
+        state["tool_families"] = {
+            "search":   ["find_query", "psspps_query"],
+            "dispatch": ["phi_enqueue", "phi_step", "phi_queue", "phi_flush", "phi_watchdog"],
+            "playback": ["gemini_clip", "shuffle_seed", "shuffle_next"],
+            "graph":    ["graph_commit", "graph_ingest", "graph_traverse", "graph_annotate"],
+            "init":     ["init_check", "system_status"],
+        }
+        state["enforcement"] = {
+            "gated_families": sorted(["search", "dispatch", "playback", "graph", "harmonic", "sim", "cairrn"]),
+            "bypass_patterns": ["psspps.find", "run_psspps", "run_find", "psspps.pipeline"],
+            "hook": "runtime_ledger",
+        }
+        return state
 
 
 @mcp.tool()

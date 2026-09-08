@@ -5,12 +5,13 @@ All phi operations (clip, shuffle, inject, propagate, CAIRRN run,
 temporal record) flow through a single CAIRRNDispatcher that gates
 execution by CODE hub coherence.
 
-Four tools:
+Five tools:
 
     phi_enqueue   — add any phi action to the CAIRRN queue
     phi_step      — one dispatcher clock tick (gate check + dispatch)
     phi_queue     — inspect queue + gate state
     phi_flush     — force-dispatch all queued actions immediately
+    phi_watchdog  — Pericles/Euler race-condition watchdog state
 
 The dispatcher singleton is lazy-constructed on first call.
 It shares state with all existing tools:
@@ -18,6 +19,13 @@ It shares state with all existing tools:
   - _temporal_index from _state    (TemporalShardIndex — TEMPORAL_REC)
   - phi_clip._get_session()        (PhiTracerSession — CLIP, SHUFFLE_*)
   - prefeed_shuffle._get_shuffle() (CAIRRNPrefeedShuffle — SHUFFLE_*)
+
+Watchdog
+--------
+make_dispatcher() now auto-attaches a DoubleRouteWatchdog.  The watchdog
+scores every DOUBLE_ROUTE / DOUBLE_ADVANCE event with the Pericles formula
+and flags events inside the Euler boundary (coherence < W(1) ≈ 0.5671).
+Call phi_watchdog() to inspect or phi_watchdog(clear=True) to reset.
 """
 from __future__ import annotations
 
@@ -29,6 +37,9 @@ from mcp_server._state import _dom_queue, _harmonic_index, _temporal_index, mcp
 
 _dispatcher: Optional[Any] = None   # CAIRRNDispatcher
 _dispatcher_lock = threading.Lock()
+
+# N_SHARDS is the harmonic ring width — used for shard-index validation in phi_enqueue.
+_N_SHARDS: int = 8
 
 
 def _get_dispatcher() -> Any:
@@ -51,8 +62,13 @@ def _get_dispatcher() -> Any:
             shuffle=shuffle,
             temporal_index=_temporal_index,
             tau=10.0,
-            # COHERENCE_THRESHOLD default used inside make_dispatcher
+            attach_watchdog=True,          # Pericles/Euler watchdog auto-wired
+            watchdog_window_ms=450.0,
         )
+        n = len(getattr(_harmonic_index, "shards", []) or [])
+        if n:
+            global _N_SHARDS
+            _N_SHARDS = n
         return _dispatcher
 
 
@@ -117,6 +133,13 @@ def phi_enqueue(
         if hub_name is not None:
             payload["hub_name"] = hub_name
         if shard_index is not None:
+            if action_kind == PhiActionKind.SHARD_INJECT:
+                if shard_index < 0 or shard_index >= _N_SHARDS:
+                    return {
+                        "error": "shard_index_out_of_range",
+                        "shard_index": shard_index,
+                        "valid_range": [0, _N_SHARDS - 1],
+                    }
             payload["shard_index"] = shard_index
         if value is not None:
             payload["value"] = value
@@ -229,3 +252,37 @@ def phi_flush() -> dict[str, Any]:
             "queue_depth": d.queue_depth,
             "coherence":  round(d.coherence, 4),
         }
+
+
+# ---------------------------------------------------------------------------
+# phi_watchdog
+# ---------------------------------------------------------------------------
+
+
+# Slash-only — kept out of @mcp.tool() to respect the 60-tool Cursor catalog cap.
+# Call via run_command("/phi-watchdog") or run_command("/phi-watchdog clear=true").
+@requires_init
+def phi_watchdog(clear: bool = False) -> dict[str, Any]:
+    """
+    Pericles / Euler race-condition watchdog state for the CAIRRN dispatcher.
+
+    Returns the DoubleRouteWatchdog state: every DOUBLE_ROUTE / DOUBLE_ADVANCE
+    event scored with the Pericles formula and flagged when inside the Euler
+    boundary (coherence < W(1) ≈ 0.5671).
+
+    Parameters
+    ----------
+    clear : reset all recorded events and per-kind timestamps (default False)
+    """
+    with _dom_queue.gate("phi_watchdog"):
+        d = _get_dispatcher()
+        wd = d._dr_watchdog
+        if wd is None:
+            return {
+                "error": "watchdog_not_attached",
+                "hint": "Dispatcher was created with attach_watchdog=False",
+            }
+        if clear:
+            wd.clear()
+            return {"cleared": True, "total_events": 0}
+        return wd.state()

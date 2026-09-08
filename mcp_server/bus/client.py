@@ -176,22 +176,81 @@ def bind_client(client: BusClient) -> BusClient:
     return client
 
 
+def _result_from_record(rec: dict[str, Any], task: str) -> dict[str, Any]:
+    """Unwrap a completed job record into the dict MCP tools return."""
+    if rec.get("status") == "done":
+        result = rec.get("result")
+        if isinstance(result, dict):
+            result = dict(result)
+            result["job_id"] = rec["job_id"]
+            result["task"] = rec.get("task", task)
+            result["status"] = "done"
+            if rec.get("source"):
+                result["source"] = rec["source"]
+            return result
+    return rec
+
+
+def _run_in_process(task: str, kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Run a registered bus task in this process when the mmap worker is down.
+
+    Cloud Agent stdio MCP has no celery worker. Search (and other) tools must
+    still return a real result instead of ``bus_unavailable``.
+    """
+    from mcp_server.bus.side_effects import apply_side_effects
+    from mcp_server.bus.tasks import run_task
+
+    job_id = f"inproc-{uuid.uuid4().hex}"
+    try:
+        payload = run_task(task, kwargs)
+    except KeyError:
+        return {
+            "error": "bus_unavailable",
+            "task": task,
+            "job_id": job_id,
+            "hint": "celery worker did not open the mmap rings",
+        }
+    except Exception as exc:
+        return {
+            "error": "in_process_failed",
+            "task": task,
+            "job_id": job_id,
+            "message": f"{type(exc).__name__}: {exc}",
+        }
+    rec: dict[str, Any] = {
+        "job_id": job_id,
+        "task": task,
+        "status": "done",
+        "result": payload,
+        "source": "in-process",
+    }
+    rec = apply_side_effects(rec)
+    return _result_from_record(rec, task)
+
+
 def submit_and_maybe_wait(
     task: str,
     *,
     wait_s: float = 60.0,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Enqueue on the bus. Wait for a result when wait_s > 0."""
+    """Enqueue on the bus. Wait for a result when wait_s > 0.
+
+    If the mmap/celery worker is not running, execute the registered task
+    in-process (Cloud MCP / tests). ``wait_s <= 0`` still requires the bus
+    because that path only returns a job ticket.
+    """
     from mcp_server.bus.side_effects import apply_side_effects
 
     client = get_client()
     if client is None:
-        return {
-            "error": "bus_unavailable",
-            "task": task,
-            "hint": "celery worker did not open the mmap rings",
-        }
+        if wait_s <= 0:
+            return {
+                "error": "bus_unavailable",
+                "task": task,
+                "hint": "celery worker did not open the mmap rings",
+            }
+        return _run_in_process(task, kwargs)
     ticket = client.submit(task, kwargs)
     if wait_s <= 0:
         return ticket
@@ -201,13 +260,4 @@ def submit_and_maybe_wait(
         ticket["hint"] = "still running — call bus_wait"
         return ticket
     rec = apply_side_effects(rec)
-    if rec.get("status") == "done":
-        result = rec.get("result")
-        if isinstance(result, dict):
-            result = dict(result)
-            result["job_id"] = rec["job_id"]
-            result["task"] = rec.get("task", task)
-            result["status"] = "done"
-            return result
-        return rec
-    return rec
+    return _result_from_record(rec, task)

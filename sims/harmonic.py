@@ -231,6 +231,9 @@ class HarmonicIndex:
         # Last vault-topology fusion (None until graph_topo_hubs applies).
         self.last_t_b_norm: float | None = None
         self.last_chi: float | None = None
+        # Goal-directed propagation state (None until set_goal is called).
+        self._goal: np.ndarray | None = None
+        self._goal_strength: float = 0.1
         # RLock so methods can safely call each other without deadlocking
         self._lock = threading.RLock()
 
@@ -314,6 +317,87 @@ class HarmonicIndex:
             ]
             return base
 
+    def inject_from_affinity(
+        self,
+        affinity_vec: "np.ndarray",
+        scale: float = 0.10,
+    ) -> dict:
+        """
+        Inject activation into shards weighted by a document affinity vector.
+
+        ``affinity_vec`` is the 8-dim output of ``psspps.scorer.harmonic_affinity`` —
+        already L1-normalised so each element is the fraction of the doc's numeric
+        mass that falls in that shard's basin.  Multiplied by ``scale`` and added
+        directly to activation, this converts retrieval evidence into index energy:
+        highly-retrieved shards grow warm, cold shards stay quiet.
+
+        Parameters
+        ----------
+        affinity_vec : np.ndarray, shape (n_shards,) — L1-normalised affinity
+        scale        : total activation to distribute (default 0.10)
+
+        Returns a dict with injected shard deltas for observability.
+        """
+        aff = np.asarray(affinity_vec, dtype=float)
+        n = min(len(aff), len(self.shards))
+        total = float(aff[:n].sum())
+        if total < 1e-12:
+            return {"injected": False, "reason": "zero_affinity"}
+
+        normalised = aff[:n] / total
+        with self._lock:
+            injections: dict[str, float] = {}
+            for i in range(n):
+                w = float(normalised[i])
+                if w > 1e-9:
+                    delta = scale * w
+                    self.shards[i].activation += delta
+                    injections[f"shard_{i}"] = round(delta, 6)
+        return {"injected": True, "scale": scale, "deltas": injections}
+
+    def ranked_affinity_inject(
+        self,
+        affinity_vecs: "list[np.ndarray]",
+        rank_weights: "list[float]",
+        scale: float = 0.15,
+    ) -> dict:
+        """
+        Inject from a list of ranked doc affinity vectors, rank-discount weighted.
+
+        Computes the weighted mean affinity: ``Σ w_r · aff_r / Σ w_r`` where
+        ``w_r = rank_weight_r`` (caller supplies rank-discounted scores).  The
+        resulting vector represents which shards the search results collectively
+        point toward.  Calls ``inject_from_affinity`` with that mean vector.
+
+        Parameters
+        ----------
+        affinity_vecs : list of 8-dim affinity arrays (one per top-ranked doc)
+        rank_weights  : parallel list of scalar weights (e.g. combined_score / rank)
+        scale         : total activation injected (default 0.15)
+        """
+        import numpy as _np
+
+        if not affinity_vecs or not rank_weights:
+            return {"injected": False, "reason": "empty_inputs"}
+
+        n = len(self.shards)
+        weighted_sum = _np.zeros(n, dtype=float)
+        total_w = 0.0
+
+        for aff, w in zip(affinity_vecs, rank_weights):
+            a = _np.asarray(aff, dtype=float)
+            a_sum = float(a[:n].sum())
+            if a_sum < 1e-12 or w <= 0:
+                continue
+            weighted_sum[:len(a)] += (w / a_sum) * a[:n]
+            total_w += w
+
+        if total_w < 1e-12:
+            return {"injected": False, "reason": "zero_weight_sum"}
+
+        mean_aff = weighted_sum / total_w
+        return self.inject_from_affinity(mean_aff, scale=scale)
+
     def inject_from_trajectory_final(self, final_x: float, value: float = 1.0) -> HarmonicShard:
         """
         Map a trajectory's final position to the nearest harmonic basin and
@@ -350,6 +434,8 @@ class HarmonicIndex:
             "isometric"  — true isometric cosine-modulated decay (IsometricCosinePropagator);
                            full bipolar cosine kernel, dissipative (total activation decays),
                            all-to-all coupling in ONE hop expands path space to N^k
+            "goal"       — local diffusion blended with gradient pull toward the goal
+                           vector set by set_goal().  Raises ValueError if no goal is set.
         """
         if mode == "resonance":
             propagator = self._resonance_propagator
@@ -357,16 +443,116 @@ class HarmonicIndex:
             propagator = self._propagator
         elif mode == "isometric":
             propagator = self._isometric_propagator
+        elif mode == "goal":
+            with self._lock:
+                if self._goal is None:
+                    raise ValueError("No goal set — call set_goal() first")
+                for _ in range(steps):
+                    # Phase 1: local diffusion
+                    self._propagator.step(self.shards)
+                    # Phase 2: gradient pull toward goal vector.
+                    # delta_i = goal_i - activation_i; each shard moves
+                    # goal_strength fraction of the way toward its target.
+                    activations = np.array([s.activation for s in self.shards], dtype=float)
+                    delta = self._goal - activations
+                    for i, shard in enumerate(self.shards):
+                        shard.activation += float(self._goal_strength * delta[i])
+                    self._step_count += 1
+            return
         else:
             raise ValueError(
                 f"Unknown propagation mode {mode!r}; "
-                "expected 'local', 'resonance', or 'isometric'"
+                "expected 'local', 'resonance', 'isometric', or 'goal'"
             )
 
         with self._lock:
             for _ in range(steps):
                 propagator.step(self.shards)
                 self._step_count += 1
+
+    def set_goal(
+        self,
+        target: int,
+        value: float = 1.0,
+        goal_strength: float = 0.1,
+    ) -> np.ndarray:
+        """
+        Set the goal vector for goal-directed propagation.
+
+        The goal is a one-hot activation vector: the target shard receives
+        ``value``, all others receive 0.  Subsequent ``propagate(mode='goal')``
+        calls blend local diffusion with a gradient pull of strength
+        ``goal_strength`` per step toward this target.
+
+        Parameters
+        ----------
+        target        : 0-based shard index to attract toward
+        value         : activation magnitude at the target shard (default 1.0)
+        goal_strength : γ ∈ (0, 1) — per-step gradient pull (default 0.1)
+
+        Returns the goal vector as a numpy array.
+        """
+        n = len(self.shards)
+        goal_vec = np.zeros(n, dtype=float)
+        goal_vec[target % n] = float(value)
+        with self._lock:
+            self._goal = goal_vec
+            self._goal_strength = float(np.clip(goal_strength, 1e-6, 1.0 - 1e-6))
+        return goal_vec
+
+    def clear_goal(self) -> None:
+        """Clear the current goal vector. propagate(mode='goal') will error until set_goal() is called again."""
+        with self._lock:
+            self._goal = None
+            self._goal_strength = 0.1
+
+    def ana_chi_modulate(self, chi: float, scale: float = 0.3) -> dict:
+        """
+        Modulate shard activations by the Ana-Chi coherence field at chi.
+
+        Each CAIRRN hub maps to one of the five Ana-Chi basins (HOME →
+        true_center, MATH → white_peak, CODE → mirror, COMMANDS → escape,
+        agent-context → boundary).  The basin proximity at ``chi`` —
+        ``exp(-|chi - chi_basin| / σ)`` — determines what fraction of
+        ``scale`` activation is routed to that hub's shards.
+
+        This closes the loop: an Ana-Chi sim that settles at chi ≈ 1.5414
+        (HOME) strengthens HOME shards; one that escapes to 2.67 (COMMANDS)
+        energises the COMMANDS shard instead.
+
+        Parameters
+        ----------
+        chi   : final Ana-Chi position from the simulation
+        scale : total activation injected across all shards (default 0.3)
+
+        Returns a dict with chi, per-basin proximities, and per-shard deltas.
+        """
+        from sims.ana_chi import BASINS, HUB_BASIN
+
+        # Basin proximity weights at this chi
+        basin_proximity = {b.name: b.proximity(chi) for b in BASINS}
+        total_prox = sum(basin_proximity.values()) or 1.0
+
+        with self._lock:
+            modulations: dict[str, float] = {}
+            for hub, shard_indices in HUB_SHARD_MAP.items():
+                basin_name = HUB_BASIN.get(hub)
+                if not basin_name:
+                    continue
+                prox = basin_proximity.get(basin_name, 0.0)
+                # Proportional share of total injection for this hub's shards
+                per_shard = scale * (prox / total_prox) / max(len(shard_indices), 1)
+                for idx in shard_indices:
+                    self.shards[idx].activation += per_shard
+                    modulations[f"shard_{idx}"] = round(per_shard, 6)
+            self.last_chi = chi
+
+        return {
+            "chi": round(chi, 6),
+            "scale": scale,
+            "basin_proximity": {k: round(v, 6) for k, v in basin_proximity.items()},
+            "shard_modulations": modulations,
+        }
 
     # ------------------------------------------------------------------
     # Inspection

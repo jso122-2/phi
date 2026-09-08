@@ -22,7 +22,7 @@ Full PSSPPS pipeline.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -59,6 +59,8 @@ class ScoredDoc:
     headings: list[str]
     wikilinks: list[str]
     snippet: str
+    affinity: list[float] = field(default_factory=list)
+    """8-dim L1-normalised harmonic affinity vector — shard basin weights for this doc."""
 
 
 @dataclass
@@ -133,7 +135,16 @@ def run_psspps(
     alpha = float(np.clip(perspective_alpha, 0.0, 1.0))
     final = sem_gated_blend(sem, persp, alpha=alpha, part=part, beta=beta)
 
-    # ---- 6b. Agent-comment boost ---------------------------------------
+    # ---- 6b. Coherence tiebreaker --------------------------------------
+    # coherence_scores = structural_order × harmonic_alignment.
+    # A document that is both focused (high structural order) AND aligned
+    # with the current harmonic hot-shard wins ties.  Gated by max_sem so
+    # it only bites when retrieval is meaningful (avoids noise amplification
+    # on low-signal queries).  Weight 0.05 keeps it a tiebreaker.
+    max_sem_pre = float(np.max(sem))
+    final = np.clip(final + 0.05 * coh * max_sem_pre, 0.0, 1.0)
+
+    # ---- 6c. Agent-comment boost ---------------------------------------
     # Comment nodes in sessions/comments/ are the memory layer; give them
     # a lift so they win ties against semantically equivalent station notes.
     for i, doc in enumerate(docs):
@@ -163,6 +174,9 @@ def run_psspps(
             headings=doc["headings"][:5],
             wikilinks=doc["wikilinks"][:8],
             snippet=snippet,
+            # Carry the affinity vector so callers can inject it back into
+            # the harmonic index (PSSPPS → shard feedback loop).
+            affinity=[round(float(v), 6) for v in affinities[idx]],
         ))
 
     try:

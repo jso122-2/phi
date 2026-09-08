@@ -4,6 +4,11 @@ PSSPPS is the MCP search function.  Live harmonic-index state modulates
 perspective_alpha (how local vs global retrieval is) unless the caller
 overrides it.  This is the MCP analogue of phi.engine.vault_context's
 basin-sequestration → alpha mapping.
+
+Cloud Agents attach ``python3 -m mcp_server.cloud`` as stdio MCP ``phi`` and
+MUST call these tools instead of running ``psspps.find`` / ``run_psspps``
+ad hoc.  When the mmap bus is down, ``submit_and_maybe_wait`` executes the
+same bus tasks in-process.
 """
 from __future__ import annotations
 
@@ -96,8 +101,11 @@ def psspps_query(
         alpha, modulation = _search_control(
             activations, perspective_alpha, _harmonic_index.last_t_b_norm,
         )
-        # TODO: K injection — after bus result lands, compute K from top result's
-        # tag coherence and inject into content's home hub shards.
+        # Affinity injection is wired automatically: the search.psspps task emits
+        # 'ranked_affinity_inject' (rank-discounted weighted-mean affinity of top
+        # docs), and side_effects._apply injects it into the harmonic index via
+        # inject_from_affinity() + propagate(2) + heal_coherence().  No extra
+        # work needed here — the loop is closed through the task/side-effect chain.
         return submit_and_maybe_wait(
             "search.psspps",
             wait_s=wait_s,

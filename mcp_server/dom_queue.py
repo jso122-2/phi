@@ -642,7 +642,9 @@ def spawn_houses() -> DOMRequestQueue:
                 "register_hook",
                 "vault_hub_state",
                 "watchdog_state",
+                "session_audit",        # runtime call ledger
                 "phi_queue",
+                "phi_watchdog",         # slash-only but routed for gate consistency
                 "bus_poll",
                 "bus_status",
                 "bus_submit",
@@ -669,6 +671,8 @@ def spawn_houses() -> DOMRequestQueue:
                 "graph_track_state",
                 "graph_track_sync",
                 "graph_annotate",
+                "vault_project",        # vault read — graph family
+                "graph_cairrn_topo",    # slash-only but routed
             }),
             "Graph worker — commit, clean, link, nest, ingest, traverse, topo hubs, status, usage-track",
         ),

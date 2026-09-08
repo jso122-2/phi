@@ -47,11 +47,13 @@ startup_errors: dict[str, str] = {}
 # ---------------------------------------------------------------------------
 
 mcp = FastMCP(
-    "spotify-rip",
+    os.environ.get("SPOTIFY_RIP_MCP_NAME", "spotify-rip"),
     instructions=(
         "Tooling server for the spotify-rip dynamical-systems project. "
         "Enforces environment initialisation, runs attractor simulations, "
-        "and manages the harmonically-sharded propagation index."
+        "and manages the harmonically-sharded propagation index. "
+        "Vault search is first-class: call find_query / psspps_query; "
+        "do not shell out to psspps Python."
     ),
 )
 install_tool_guard(mcp)

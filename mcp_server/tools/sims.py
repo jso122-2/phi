@@ -79,16 +79,21 @@ def neg_exp_sim(x0: float) -> dict[str, Any]:
     """
     with _dom_queue.gate("neg_exp_sim"):
         traj = run_neg_exp_map(x0)
+        final_x = traj.steps[-1] if traj.steps else x0
+        fixed_point = -0.5671432904097838
         result = {
-            "x0":                     traj.x0,
-            "steps":                  len(traj.steps),
-            "final_x":                round(traj.steps[-1], 8) if traj.steps else x0,
-            "converged":              traj.converged,
-            "lambert_w_fixed_point":  -0.5671432904097838,
-            "error_to_fixed_point":   round(
-                abs((traj.steps[-1] if traj.steps else x0) - (-0.5671432904097838)), 8
-            ),
+            "x0":                    traj.x0,
+            "steps":                 len(traj.steps),
+            "final_x":               round(final_x, 8),
+            "converged":             traj.converged,
+            "lambert_w_fixed_point": fixed_point,
+            "error_to_fixed_point":  round(abs(final_x - fixed_point), 8),
         }
+        # Inject final position into the harmonic index so the Lambert-W
+        # attractor shapes the search perspective (mirrors double_well_sim).
+        shard = _harmonic_index.inject_from_trajectory_final(final_x)
+        result["injected_shard"] = shard.index
+        result["shard_basin_centre"] = shard.basin_centre
         _vault_hub.push_sim("neg_exp_sim", result)
         return result
 

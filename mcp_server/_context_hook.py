@@ -159,6 +159,14 @@ def _submit_context_psspps() -> None:
             _fire_direct_psspps(query, activations, alpha)
             return
 
+        # Apply side effects here — the context hook bypasses submit_and_maybe_wait
+        # so ranked_affinity_inject must be processed manually.
+        try:
+            from mcp_server.bus.side_effects import apply_side_effects
+            rec = apply_side_effects(rec)
+        except Exception as _se_exc:
+            print(f"[psspps_context_hook] side effects failed: {_se_exc}", file=sys.stderr)
+
         top_docs = rec.get("result", {}).get("top_docs", [])
         _write_and_notify(top_docs, alpha, query, source="bus", activations=activations)
 
@@ -170,6 +178,7 @@ def _fire_direct_psspps(query: str, activations: Any, alpha: float) -> None:
     """Fallback: run the PSSPPS pipeline in-process when the bus is down."""
     try:
         from psspps.pipeline import run_psspps
+        from mcp_server._state import _harmonic_index
 
         result = run_psspps(query, activations, top_k=5, perspective_alpha=alpha)
         top_docs = [
@@ -178,9 +187,26 @@ def _fire_direct_psspps(query: str, activations: Any, alpha: float) -> None:
                 "path":           d.path,
                 "combined_score": d.combined_score,
                 "snippet":        d.snippet,
+                "affinity":       d.affinity,
             }
             for d in result.top_docs
         ]
+
+        # Apply ranked affinity injection directly — mirrors what side_effects does
+        # for the bus path so the context hook never opens a one-way valve.
+        try:
+            import numpy as _np
+            from mcp_server.bus.tasks_search import _ranked_affinity_inject
+            rai = _ranked_affinity_inject(top_docs, score_key="combined_score", scale=0.12)
+            if rai and _harmonic_index is not None:
+                aff_vec = _np.asarray(rai["vec"], dtype=float)
+                r = _harmonic_index.inject_from_affinity(aff_vec, scale=rai["scale"])
+                if r.get("injected"):
+                    _harmonic_index.propagate(steps=2, mode="local")
+                    _harmonic_index.heal_coherence(heal_rate=0.02)
+        except Exception as _inj_exc:
+            print(f"[psspps_context_hook] direct affinity inject failed: {_inj_exc}", file=sys.stderr)
+
         _write_and_notify(top_docs, alpha, query, source="direct", activations=activations)
     except Exception as exc:
         print(f"[psspps_context_hook] direct fallback failed: {exc}", file=sys.stderr)
