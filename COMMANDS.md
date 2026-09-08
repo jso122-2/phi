@@ -3,7 +3,9 @@
 #hub #command
 
 Every command here is **agent-executable** via the `spotify-rip` MCP server.
-Agents read `.cursor/rules/slash-commands.mdc` and call the MCP tools directly.
+Source of truth: `mcp_server.commands.SPECS`.
+
+Agents call MCP `run_command(command="/…")` or `list_commands()`. Do not Shell a slash. Legacy one-shot slashes still parse as aliases of `/read` / `/do`. Cursor rule: `.cursor/rules/slash-commands.mdc`.
 
 ---
 
@@ -13,150 +15,183 @@ Agents read `.cursor/rules/slash-commands.mdc` and call the MCP tools directly.
 → [[mcp-server]] — the tools being called  
 → [[attractors]] — sim commands run the attractor engine  
 → [[harmonic-index]] — index commands control the harmonic ring  
-→ [[cairrn]] — CAIRRN hub pipeline; `/cairrn` commands  
-→ [[psspps]] — RAG pipeline powering `/psspps`  
-→ [[environment]] — `/health` checks the environment  
+→ [[cairrn]] — CAIRRN hub pipeline; `/do cairrn`  
+→ [[psspps]] — RAG pipeline powering `/read psspps`  
+→ [[environment]] — `/read health` checks the environment  
+→ [[graph]] — vault graph worker  
+→ [[temporal-index]] — temporal sharding  
+→ [[agent-context]] — workflow modes  
 
 ---
 
-## Simulation commands
-
-### `/sim <x0>`
-Runs the double-well gradient descent from starting position x0.
+## How to run
 
 ```
-/sim 1.5      → converges to +1.96
-/sim -2.0     → converges to -1.96
-/sim 0.001    → near saddle point, slow convergence to +1.96
+list_commands()
+run_command(command="/read index")
+run_command(command="/do sim 1.5")
+run_command(command="/do commit prompt | thinking | outcome")
 ```
 
-MCP tool: `double_well_sim(x0, lr=0.05, alpha=1.96, inject_into_index=True)`
+Primary surface:
+
+| Umbrella | Role |
+|---|---|
+| `/read <sub> …` | Inspect (read-only tools). Bare `/read` loads vault context. |
+| `/do <sub> …` | Mutate (sims, inject, commit, enqueue, …). Bare `/do` lists subs. |
+| `/read help` `/do help` | List every subcommand. |
 
 ---
 
-### `/neg-exp <x0>`
-Iterates f(x) = −eˣ from x0, converges to Lambert W fixed point ≈ −0.5671.
+## `/read` — inspect
+
+MCP: `run_command("/read <sub> …")`. Init-free tools work before the session gate.
+
+| Sub | Alias | Tool | Args | Notes |
+|---|---|---|---|---|
+| `status` | `/status` | `system_status` | — | Full health — env + index. Init-free. |
+| `health` | `/health` | `init_check` | — | Environment / gate check. Init-free. |
+| `index` | `/index` | `harmonic_index_state` | — | 8-shard harmonic index. |
+| `hub` | `/hub-state` | `hub_state` | — | Harmonic index by station hub. |
+| `ana-chi` | `/ana-chi-state` | `ana_chi_state` | `[chi]` | Ana-Chi basin snapshot. |
+| `graph` | `/graph-status` | `graph_status` | — | Vault graph health. Init-free. |
+| `clean` | `/graph-clean` | `graph_clean` | — | Orphans + dead wikilinks. Init-free. |
+| `nest` | `/graph-nest` | `graph_nest` | — | Suggest hub tags. Init-free. |
+| `track` | `/graph-track` | `graph_track_state` | — | Usage ledger + git-hot notes. Init-free. |
+| `traverse` | `/graph-traverse` | `graph_traverse` | `<seed…>` | `--top-k` `--hops` `--wait`. |
+| `vault` | `/vault-hub` | `vault_hub_state` | — | Live vault-hub snapshot. |
+| `vault-store` | `/vault-store` | `vault_store_stats` | — | SQL store: nodes, edges, usage. Init-free. |
+| `watchdog` | `/watchdog` | `watchdog_state` | — | Stall + contention. |
+| `hooks` | `/hooks` | `list_hooks` | — | Pre-hook chain. Init-free. |
+| `queue` | `/queue` | `dom_queue_state` | — | DOM house queue. Init-free. |
+| `commands` | `/commands` | `list_commands` | — | This catalog. Init-free. |
+| `cairrn` | `/cairrn-state` | `cairrn_hub_state` | — | Static CAIRRN hub geometry. |
+| `css` | `/cairrn-css` | `cairrn_css_state` | — | CSS bitmask / middle-shard. |
+| `m3` | `/cairrn-m3` | `cairrn_m3_gate` | — | M3 quality gate. |
+| `temporal` | `/temporal-state` | `temporal_state` | — | Temporal sharding index. |
+| `vector` | `/temporal-vector` | `temporal_vector` | — | Hub × window matrix. |
+| `temporal-coherence` | `/temporal-coherence` | `temporal_coherence` | — | Ana-Chi coherence of temporal index. |
+| `phi` | `/phi-queue` | `phi_queue` | — | Phi dispatcher queue + gate. |
+| `shuffle` | `/shuffle-state` | `shuffle_state` | — | Shuffle + gate state. |
+| `bus` | `/bus-status` | `bus_status` | — | Mmap ring + worker. Init-free. |
+| `poll` | `/bus-poll` | `bus_poll` | `job_id` | Poll a bus job. Init-free. |
+| `forecast` | `/forecast` | `forecast_state` | — | Forecast pocket. Init-free. |
+| `coherence` | `/coherence-state` | `coherence_state` | `[tail]` | Session trajectory + BMAD. Init-free. |
+| `psspps` | `/psspps` | `psspps_query` | `<query…>` | `--alpha` `--top-k` `--wait`. See [[psspps]]. |
+| `find` | `/find` | `find_query` | `<query…>` | Pericles exact retrieval. `--wait`. |
+| `audit` | `/code-audit` | `code_audit` | `target [mode]` | Read-only code structure audit. |
+| `context` | `/context-state` | `system_status` | — | Session-open PSSPPS handshake. Init-free. |
 
 ```
-/neg-exp 0.0      → 20 steps to x* ≈ -0.5671
-/neg-exp -0.5     → already near x*, converges fast
+/read index
+/read psspps what is the Lambert W fixed point --top-k 5
+/read find attractors double well
+/read traverse HOME --hops 2
+/read poll <job_id>
+/read audit mcp_server
 ```
-
-MCP tool: `neg_exp_sim(x0)`  
-See [[lambert-w]] for the math.
 
 ---
 
-### `/sweep`
-Sweeps 9 initial conditions across [−4, +4] and runs double-well on each.
+## `/do` — mutate
+
+MCP: `run_command("/do <sub> …")`.
+
+| Sub | Alias | Tool | Args | Notes |
+|---|---|---|---|---|
+| `sim` | `/sim` | `double_well_sim` | `x0` | `--inject`. See [[attractors]]. |
+| `neg-exp` | `/neg-exp` | `neg_exp_sim` | `x0` | f(x)=−eˣ → Lambert W. See [[lambert-w]]. |
+| `sweep` | `/sweep` | `sweep_attractors` | `[x0_min] [x0_max] [n_points]` | Default [−4, +4], 9 points. |
+| `langevin` | `/langevin` | `langevin_sim` | `x0` | Overdamped Langevin. See [[mfpt]]. |
+| `mfpt` | `/mfpt` | `mfpt_estimate` | `[noise_scale]` | Mean first passage vs Kramers. |
+| `ana-chi` | `/ana-chi` | `ana_chi_sim` | `[chi_0]` | Ana-Chi 5-basin flow. |
+| `propagate` | `/propagate` | `harmonic_propagate` | `[steps]` | Advance harmonic ring. |
+| `inject` | `/inject` | `harmonic_inject` | `shard_index value` | Direct shard activation. |
+| `reset` | `/reset` | `harmonic_reset` | — | Re-seed ring to HOME floor. |
+| `hub-inject` | `/hub-inject` | `hub_inject` | `hub_name value` | Inject via station-hub name. |
+| `set-goal` | `/set-goal` | `harmonic_set_goal` | `target_shard` | Goal-directed propagation. |
+| `clear-goal` | `/clear-goal` | `harmonic_clear_goal` | — | Clear goal vector. |
+| `commit` | `/graph-commit` | `graph_commit` | `<prompt> \| <thinking> \| <outcome>` | Session → vault node. |
+| `link` | `/graph-link` | `graph_link` | — | Auto-link related nodes. |
+| `topo` | `/graph-topo-hubs` | `graph_topo_hubs` | — | Elect hubs. `--write-tags` `--apply-cairrn` `--prefix` `--min-size`. |
+| `cairrn-topo` | `/cairrn-topo` | `graph_topo_hubs` | — | Topo election + CAIRRN overlay (`apply_cairrn=True`). |
+| `ingest` | `/graph-ingest` | `graph_ingest` | `source_dir` | `--dry-run` `--max-files`. |
+| `ingest-source` | `/graph-ingest-source` | `graph_ingest_source` | `<packages…>` | AST-extract Python → `source/` nodes. `--dry-run`. |
+| `sync` | `/graph-sync-manifest` | `graph_sync_manifest` | `[manifest_path]` | Pulse hubs from ingest manifest. |
+| `track-sync` | `/graph-track-sync` | `graph_track_sync` | — | Heat → `.gitignore` + git index. |
+| `annotate` | `/graph-annotate` | `graph_annotate` | `<target_stem> \| <comment>` | Agent commentary node. |
+| `vault-project` | `/vault-project` | `vault_project` | `node_id` | Re-materialise session `.md` from SQL. `--force`. |
+| `vault-migrate` | `/vault-migrate` | `vault_migrate` | `[batch_size]` | Vault `.md` → SQL upsert. |
+| `test` | `/test` | `run_tests` | `[mode]` | `--cov`. |
+| `cairrn` | `/cairrn-run` | `cairrn_hub_run` | `hub_name metric` | Full CAIRRN pipeline. See [[cairrn]]. |
+| `batch` | `/cairrn-batch` | `cairrn_batch_run` | `[metric]` | CAIRRN across all hubs. |
+| `k` | `/cairrn-k` | `cairrn_neuro_k` | `tracer_consensus_value` | Neuro-activation K chain. `--inject`. |
+| `record` | `/temporal-record` | `temporal_record` | `hub_name value` | Record hub activation at t=0. |
+| `advance` | `/temporal-advance` | `temporal_advance` | `[steps]` | Advance temporal clock. |
+| `temporal-reset` | `/temporal-reset` | `temporal_reset` | — | Zero temporal activations. |
+| `enqueue` | `/phi-enqueue` | `phi_enqueue` | `kind <query…>` | `--hub` `--shard` `--top-k`. |
+| `step` | `/phi-step` | `phi_step` | — | One dispatcher clock tick. |
+| `flush` | `/phi-flush` | `phi_flush` | — | Force-dispatch queued phi actions. |
+| `clip` | `/clip` | `gemini_clip` | `<query…>` | Clip top-K library tracks. `--top-k`. |
+| `seed` | `/shuffle-seed` | `shuffle_seed` | — | Bootstrap CAIRRN prefeed shuffle. |
+| `shuffle-step` | `/shuffle-step` | `shuffle_step` | — | One shuffle scheduler tick. |
+| `next` | `/shuffle-next` | `shuffle_next` | `[peek_ahead]` | `--peek`. |
+| `submit` | `/bus-submit` | `bus_submit` | `task <payload_json…>` | Enqueue mmap/celery job. |
+| `wait` | `/bus-wait` | `bus_wait` | `job_id` | `--timeout`. |
+| `restart` | `/bus-restart` | `bus_restart` | — | Restart bus worker. |
+| `10` | `/10` | `rate_ten` | `[target]` | Rate a project or module out of 10. |
+| `notion-tick` | `/notion-tick` | `notion_reservoir_tick` | `[shards] [note]` | `--dry-run`. Fire Notion Reservoir tick: pure edges + Scores update. |
+| `notion-state` | `/notion-state` | `notion_reservoir_state` | — | Show shard registry + token status. Init-free. |
 
 ```
-/sweep                      → default sweep
-/sweep -10 10 21            → wider range, 21 points
+/do sim 1.5
+/do sim -2.0 --inject
+/do sweep -10 10 21
+/do inject 0 1.0
+/do commit did X | thought Y | built Z
+/do cairrn HOME 1.0
+/do cairrn MATH 0.5
+/do test --cov
+/do 10 mcp_server
 ```
 
-MCP tool: `sweep_attractors(x0_min=-4.0, x0_max=4.0, n_points=9, alpha=1.96)`
+### `/cairrn` arity (legacy)
 
----
-
-### `/langevin <x0>`
-Overdamped Langevin on V(x)=(x²−α²)². Noise enables thermally-activated escape.
-
-MCP tool: `langevin_sim(x0, noise_scale=2.0, steps=500)`  
-See [[mfpt]] for the Kramers rate.
-
----
-
-### `/mfpt [noise_scale]`
-Empirical mean first passage time vs Kramers prediction.
-
-MCP tool: `mfpt_estimate(noise_scale=2.0, n_trials=200)`
-
----
-
-## Harmonic index commands
-
-### `/index`
-Print the current activation state of all 8 harmonic shards.
-
-MCP tool: `harmonic_index_state()`
-
----
-
-### `/propagate [steps]`
-Advance the harmonic wave propagation by N cycles.
+Bare `/cairrn` is **not** `/do cairrn`. It inspects hub geometry (`hub_state`). With two args it runs the pipeline (`cairrn_hub_run`).
 
 ```
-/propagate        → 1 cycle
-/propagate 10     → 10 cycles
+/cairrn                 → hub_state()          (same family as /read hub)
+/cairrn HOME 1.0        → cairrn_hub_run(...)  (same as /do cairrn HOME 1.0)
+/read cairrn            → cairrn_hub_state()   (static geometry)
 ```
-
-MCP tool: `harmonic_propagate(steps=1)`
 
 ---
 
-### `/inject <shard> <value>`
-Directly inject activation into a shard.
+## Workflow modes
 
-```
-/inject 0 1.0     → add 1.0 to shard 0 (basin centre 1.96)
-/inject 3 2.5     → add 2.5 to shard 3 (basin centre 7.84)
-```
+Read the contract file immediately and follow it. MCP `run_command` returns the path; it does not edit files.
 
-MCP tool: `harmonic_inject(shard_index, value=1.0)`
+| Command | File | One-liner |
+|---|---|---|
+| `/talk` | `.agent-context/talk.md` | Strategic discussion — align before building. |
+| `/explain` | `.agent-context/explain.md` | Plain-language explanation. |
+| `/dev` | `.agent-context/dev.md` | Build mode — write, run, iterate. |
+| `/modular` | `.agent-context/modular.md` | Package raw output cleanly. |
+| `/wire` | `.agent-context/wire.md` | Connect imports, interfaces, pipeline. |
+| `/edit` | `.agent-context/edit.md` | Surgical inline fixes. |
+| `/clean` | `.agent-context/clean.md` | Fix repo file tree. |
+| `/audit` | `.agent-context/audit.md` | Three-layer health audit (waits before fixing). |
+| `/read` | `.agent-context/read.md` | Inspect — bare loads vault context; `/read <sub>` dispatches. |
 
----
-
-### `/reset`
-Zero all harmonic index activations and reset the step counter.
-
-MCP tool: `harmonic_reset()`
-
----
-
-## System commands
-
-### `/status`
-Full system health report: environment, packages, harmonic index state.
-
-MCP tool: `system_status()`
-
----
-
-### `/health`
-Environment-only check: Python version, package availability, import smoke-test.
-
-MCP tool: `init_check()`
-
----
-
-### `/test`
-Run the full pytest suite. Returns pass/fail counts and stdout.
-
-```
-/test           → standard run
-/test --cov     → with coverage on sims/ workers/
-```
-
-MCP tool: `run_tests(coverage=False)`
+See [[agent-context]].
 
 ---
 
 ## Find — exact vault retrieval
 
-### `/find <query>`
-Pericles-scored exact keyword retrieval across the entire Obsidian vault.
-Three-stage funnel — no room for error.
-
-```
-/find attractors double well
-/find Lambert W fixed point
-/find harmonic shard propagation
-```
+`/read find <query>` — Pericles-scored exact keyword retrieval. Three-stage funnel.
 
 MCP tool: `find_query(query)`
-
-**Funnel stages:**
 
 | Stage | What happens |
 |---|---|
@@ -175,33 +210,19 @@ MCP tool: `find_query(query)`
 | `D` | Drift / iwave: `sin(π·β/2)` — positive half-sine, β = k / max\_k |
 | `x` | Confidence denominator: `max(|k·N_j|, D)` |
 
-See [[psspps]] for the underlying scoring engine.
-
 ---
 
 ## PSSPPS — vault RAG query
 
-### `/psspps <query>`
-Perspective-Oriented Semantic Scored Personalized Parsing Scored query against
-the Obsidian vault.  Retrieves relevant nodes, scores them by TF-IDF semantic
-similarity blended with the harmonic index perspective, and reports whether RAG
-actually helped.
-
-```
-/psspps what is the Lambert W fixed point
-/psspps how does local propagation work
-/psspps explain harmonic sharding
-```
+`/read psspps <query>` — perspective-oriented RAG against the Obsidian vault.
 
 MCP tool: `psspps_query(query, top_k=3, perspective_alpha=0.5)`
 
 | Parameter | Default | Description |
 |---|---|---|
 | `query` | — | Natural-language search string |
-| `top_k` | 3 | Number of top docs to return |
-| `perspective_alpha` | 0.5 | 0.0 = pure semantic · 1.0 = pure harmonic perspective |
-
-See [[psspps]] for full pipeline documentation.
+| `top_k` | 3 | Number of top docs to return (`--top-k`) |
+| `perspective_alpha` | 0.5 | 0.0 = pure semantic · 1.0 = pure harmonic (`--alpha`) |
 
 ---
 
@@ -209,107 +230,10 @@ See [[psspps]] for full pipeline documentation.
 
 If commands are not responding:
 1. Check Cursor Settings → MCP → spotify-rip → Restart
-2. Or run `/health` to verify environment
+2. Or run `/read health` to verify environment
 
 The server is configured in `.cursor/mcp.json`.  
 See [[mcp-server]] for full detail.
-
----
-
----
-
-## CAIRRN hub pipeline
-
-### `/cairrn`
-Inspect current hub geometry — χ values, gravity, shard assignments, coherence state.
-
-MCP tool: `hub_state()`
-
----
-
-### `/cairrn <hub> <metric>`
-Run a metric through the full three-layer CAIRRN pipeline for the given hub.
-
-```
-/cairrn HOME 1.0         → modulated by true_center basin (gravity 3.00)
-/cairrn MATH 0.5         → modulated by white_peak basin (gravity 2.00, decay 0.95)
-/cairrn CODE 0.85        → modulated by mirror basin (gravity 1.50, decay 0.93)
-/cairrn COMMANDS 0.3     → modulated by escape basin (gravity 1.00, decay 0.90)
-/cairrn agent-context 2.0  → modulated by boundary basin (gravity 0.50)
-```
-
-MCP tool: `cairrn_hub_run(hub_name, metric)`  
-See [[cairrn]] for full layer documentation.
-
----
-
-## Graph worker commands
-
-Session push is `graph_commit`. Code push is git to `.hub.git`. Same vault.
-
-### `/graph-commit`
-Write this session as a vault node. MCP: `graph_commit(prompt, thinking, outcome)`
-
-### `/graph-status` `/graph-clean` `/graph-nest`
-Read-only vault scan. MCP: `graph_status` / `graph_clean` / `graph_nest`
-
-### `/graph-link` `/graph-traverse` `/graph-topo-hubs`
-Link, walk, elect hubs. See [[graph]].
-
-### `/graph-ingest` `/graph-ingest-source`
-Ingest a directory or this repo's Python modules into vault nodes.
-
-### `/graph-track` `/graph-track-sync`
-Usage-weighted git tracking. Heat = used / accessed / amended.
-Only hot vault notes are git-tracked. MCP: `graph_track_state` / `graph_track_sync`
-
----
-
-## Workflow mode commands (agent skills)
-
-### `/audit`
-Full three-layer health audit: vault graph + codebase + environment.  
-Outputs a `CRITICAL → HIGH → MEDIUM → LOW → PASS` report.  
-Waits for confirmation before fixing anything.
-
-Calls: `graph_status` → `graph_clean` → `init_check` → `system_status` → pytest → mypy
-
----
-
-### `/talk`
-Strategic discussion mode — no file edits, structured reasoning only.  
-Output format: `RESTATE → OPTIONS → PICK → OPEN`
-
----
-
-### `/explain [<topic>]`
-Plain-language explanation of whatever was asked. Everyday words, no file edits, no build plan.  
-Output format: `IN SHORT → HOW IT WORKS → EXAMPLE`
-
----
-
-### `/dev`
-Build mode — write, run, iterate, ship.
-
----
-
-### `/modular`
-Raw dev output → clean minimal Python package.
-
----
-
-### `/wire`
-Connect all pieces — fix imports, thread config, smoke test every seam.
-
----
-
-### `/edit`
-Surgical inline fix — shape/type/logic bugs, EDA misses.
-
----
-
-### `/clean`
-Fix repo file tree — move, delete, normalise, update `.gitignore`.
 
 ---
 
@@ -330,7 +254,6 @@ Fix repo file tree — move, delete, normalise, update `.gitignore`.
 → [[hub-classifier]]
 → [[cursor-skills]]
 → [[2026-07-13-042743-configure-the-obsidian-graph-as-the-hub-buil]]
-
 
 → [[config]]
 → [[obsidian-exporter]]

@@ -156,6 +156,7 @@ _BUS = "mcp_server.tools.bus"
 _FORE = "mcp_server.tools.forecast"
 _MOD = "mcp_server.tools.modular"
 _RATE = "mcp_server.tools.rate"
+_NTN = "mcp_server.tools.notion_reservoir"
 
 
 SPECS: tuple[CommandSpec, ...] = (
@@ -322,6 +323,16 @@ SPECS: tuple[CommandSpec, ...] = (
          "Session harmonic trajectory + BMAD pressure signals.", init_free=True,
          optional=("tail",), types={"tail": "int"}),
 
+    # -- notion reservoir ----------------------------------------------------
+    _mcp("notion-tick", "notion_reservoir_tick", _NTN,
+         "Fire a Notion Reservoir tick: write pure edges + update Scores.",
+         optional=("shards", "note"),
+         bool_flags=("dry_run",),
+         defaults={"dry_run": False}),
+    _mcp("notion-state", "notion_reservoir_state", _NTN,
+         "Show current Notion Reservoir shard registry + token status.",
+         init_free=True),
+
     # -- umbrellas + workflow modes ----------------------------------------
     _disp("do", "Mutate — sim, inject, commit, enqueue, …"),
     _wf("talk", ".agent-context/talk.md", "Strategic discussion — align before building."),
@@ -378,6 +389,7 @@ READ_SUBS: Final[dict[str, str]] = {
     "find": "find",
     "audit": "code-audit",
     "context": "context-state",
+    "vault-store": "vault-store",
 }
 
 # Mutate umbrella: /do <sub> → catalog slash. Values must exist in CATALOG.
@@ -421,6 +433,8 @@ DO_SUBS: Final[dict[str, str]] = {
     "wait": "bus-wait",
     "restart": "bus-restart",
     "10": "10",
+    "vault-project": "vault-project",
+    "vault-migrate": "vault-migrate",
 }
 
 _HELP_TOKS: Final[frozenset[str]] = frozenset({"help", "--help", "--list", "subs", "subcommands"})
@@ -547,6 +561,19 @@ _missing_umbrella = [
 ]
 if _missing_umbrella:
     raise RuntimeError(f"umbrella targets missing from CATALOG: {_missing_umbrella}")
+
+# Dual-arity /cairrn stays a legacy slash (bare → hub_state, args → cairrn_hub_run).
+_UMBRELLA_EXEMPT: Final[frozenset[str]] = frozenset({"cairrn", "read", "do"})
+_mcp_orphans = [
+    s.slash
+    for s in SPECS
+    if s.kind == "mcp"
+    and s.slash not in READ_SUBS.values()
+    and s.slash not in DO_SUBS.values()
+    and s.slash not in _UMBRELLA_EXEMPT
+]
+if _mcp_orphans:
+    raise RuntimeError(f"MCP slashes missing from /read or /do: {_mcp_orphans}")
 
 # ---------------------------------------------------------------------------
 # Tokenise / coerce
