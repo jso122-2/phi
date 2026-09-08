@@ -28,7 +28,9 @@ htmlcov/
 .cache/
 
 # Nested Cursor dir — workspace rules live at repo-root .cursor/
-.cursor/
+# Ignore everything except the committed cloud MCP server registration.
+.cursor/*
+!.cursor/mcp.json
 
 # Runtime mycelial / tracer logs (rewritten every tick)
 agent-log/*.txt
