@@ -1,0 +1,10 @@
+{
+  "name": "phi",
+  "install": "pip install --break-system-packages -e '.[dev]'\npip install --break-system-packages networkx",
+  "mcpServerAllowlist": [
+    {
+      "name": "phi",
+      "command": "python3"
+    }
+  ]
+}

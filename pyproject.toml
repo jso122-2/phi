@@ -13,6 +13,7 @@ dependencies = [
     "matplotlib>=3.8",
     "mcp>=1.0",
     "fastembed>=0.3",
+    "networkx>=3.0",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +24,7 @@ dev = [
 
 [project.scripts]
 spotify-rip-mcp = "mcp_server.server:main"
+phi-cloud-mcp = "mcp_server.cloud:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

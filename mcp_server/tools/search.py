@@ -4,6 +4,11 @@ PSSPPS is the MCP search function.  Live harmonic-index state modulates
 perspective_alpha (how local vs global retrieval is) unless the caller
 overrides it.  This is the MCP analogue of phi.engine.vault_context's
 basin-sequestration → alpha mapping.
+
+Cloud Agents attach ``python3 -m mcp_server.cloud`` as stdio MCP ``phi`` and
+MUST call these tools instead of running ``psspps.find`` / ``run_psspps``
+ad hoc.  When the mmap bus is down, ``submit_and_maybe_wait`` executes the
+same bus tasks in-process.
 """
 from __future__ import annotations
 
