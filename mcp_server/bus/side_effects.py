@@ -134,6 +134,26 @@ def _apply(result: dict[str, Any]) -> None:
         except Exception:
             pass
 
+    # Ranked affinity inject — PSSPPS/find feedback loop.
+    # The search tasks compute a rank-discounted weighted-mean affinity vector
+    # from the top retrieved docs and store it as 'ranked_affinity_inject'.
+    # Injecting it here closes the loop: retrieved shard patterns reinforce
+    # the index so future searches see the same perspective lens that worked.
+    rai = result.get("ranked_affinity_inject")
+    if isinstance(rai, dict):
+        vec = rai.get("vec")
+        scale = float(rai.get("scale") or 0.15)
+        if vec:
+            import numpy as _np
+            aff_vec = _np.asarray(vec, dtype=float)
+            inject_result = _harmonic_index.inject_from_affinity(aff_vec, scale=scale)
+            if inject_result.get("injected"):
+                # Propagate to spread the retrieved energy; heal coherence.
+                _harmonic_index.propagate(steps=2, mode="local")
+                _harmonic_index.heal_coherence(heal_rate=0.02)
+                _ledger_record("side_effect:ranked_affinity_inject")
+                result["affinity_inject_applied"] = inject_result
+
     if result.get("touch_harmonic"):
         _vault_hub.push_all(harmonic=_harmonic_index.state())
 
@@ -145,5 +165,5 @@ def _apply(result: dict[str, Any]) -> None:
             sim_result=sim,
             harmonic=_harmonic_index.state(),
         )
-    elif pulse_hubs or pulse_home or result.get("touch_commit"):
+    elif pulse_hubs or pulse_home or result.get("touch_commit") or rai:
         _vault_hub.push_all(harmonic=_harmonic_index.state())

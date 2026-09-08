@@ -317,6 +317,87 @@ class HarmonicIndex:
             ]
             return base
 
+    def inject_from_affinity(
+        self,
+        affinity_vec: "np.ndarray",
+        scale: float = 0.10,
+    ) -> dict:
+        """
+        Inject activation into shards weighted by a document affinity vector.
+
+        ``affinity_vec`` is the 8-dim output of ``psspps.scorer.harmonic_affinity`` —
+        already L1-normalised so each element is the fraction of the doc's numeric
+        mass that falls in that shard's basin.  Multiplied by ``scale`` and added
+        directly to activation, this converts retrieval evidence into index energy:
+        highly-retrieved shards grow warm, cold shards stay quiet.
+
+        Parameters
+        ----------
+        affinity_vec : np.ndarray, shape (n_shards,) — L1-normalised affinity
+        scale        : total activation to distribute (default 0.10)
+
+        Returns a dict with injected shard deltas for observability.
+        """
+        aff = np.asarray(affinity_vec, dtype=float)
+        n = min(len(aff), len(self.shards))
+        total = float(aff[:n].sum())
+        if total < 1e-12:
+            return {"injected": False, "reason": "zero_affinity"}
+
+        normalised = aff[:n] / total
+        with self._lock:
+            injections: dict[str, float] = {}
+            for i in range(n):
+                w = float(normalised[i])
+                if w > 1e-9:
+                    delta = scale * w
+                    self.shards[i].activation += delta
+                    injections[f"shard_{i}"] = round(delta, 6)
+        return {"injected": True, "scale": scale, "deltas": injections}
+
+    def ranked_affinity_inject(
+        self,
+        affinity_vecs: "list[np.ndarray]",
+        rank_weights: "list[float]",
+        scale: float = 0.15,
+    ) -> dict:
+        """
+        Inject from a list of ranked doc affinity vectors, rank-discount weighted.
+
+        Computes the weighted mean affinity: ``Σ w_r · aff_r / Σ w_r`` where
+        ``w_r = rank_weight_r`` (caller supplies rank-discounted scores).  The
+        resulting vector represents which shards the search results collectively
+        point toward.  Calls ``inject_from_affinity`` with that mean vector.
+
+        Parameters
+        ----------
+        affinity_vecs : list of 8-dim affinity arrays (one per top-ranked doc)
+        rank_weights  : parallel list of scalar weights (e.g. combined_score / rank)
+        scale         : total activation injected (default 0.15)
+        """
+        import numpy as _np
+
+        if not affinity_vecs or not rank_weights:
+            return {"injected": False, "reason": "empty_inputs"}
+
+        n = len(self.shards)
+        weighted_sum = _np.zeros(n, dtype=float)
+        total_w = 0.0
+
+        for aff, w in zip(affinity_vecs, rank_weights):
+            a = _np.asarray(aff, dtype=float)
+            a_sum = float(a[:n].sum())
+            if a_sum < 1e-12 or w <= 0:
+                continue
+            weighted_sum[:len(a)] += (w / a_sum) * a[:n]
+            total_w += w
+
+        if total_w < 1e-12:
+            return {"injected": False, "reason": "zero_weight_sum"}
+
+        mean_aff = weighted_sum / total_w
+        return self.inject_from_affinity(mean_aff, scale=scale)
+
     def inject_from_trajectory_final(self, final_x: float, value: float = 1.0) -> HarmonicShard:
         """
         Map a trajectory's final position to the nearest harmonic basin and

@@ -22,7 +22,7 @@ Full PSSPPS pipeline.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -59,6 +59,8 @@ class ScoredDoc:
     headings: list[str]
     wikilinks: list[str]
     snippet: str
+    affinity: list[float] = field(default_factory=list)
+    """8-dim L1-normalised harmonic affinity vector — shard basin weights for this doc."""
 
 
 @dataclass
@@ -172,6 +174,9 @@ def run_psspps(
             headings=doc["headings"][:5],
             wikilinks=doc["wikilinks"][:8],
             snippet=snippet,
+            # Carry the affinity vector so callers can inject it back into
+            # the harmonic index (PSSPPS → shard feedback loop).
+            affinity=[round(float(v), 6) for v in affinities[idx]],
         ))
 
     try:

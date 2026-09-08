@@ -101,8 +101,11 @@ def psspps_query(
         alpha, modulation = _search_control(
             activations, perspective_alpha, _harmonic_index.last_t_b_norm,
         )
-        # TODO: K injection — after bus result lands, compute K from top result's
-        # tag coherence and inject into content's home hub shards.
+        # Affinity injection is wired automatically: the search.psspps task emits
+        # 'ranked_affinity_inject' (rank-discounted weighted-mean affinity of top
+        # docs), and side_effects._apply injects it into the harmonic index via
+        # inject_from_affinity() + propagate(2) + heal_coherence().  No extra
+        # work needed here — the loop is closed through the task/side-effect chain.
         return submit_and_maybe_wait(
             "search.psspps",
             wait_s=wait_s,

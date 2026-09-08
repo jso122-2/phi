@@ -82,6 +82,8 @@ class FindCandidate:
     headings: list[str] = field(default_factory=list)
     wikilinks: list[str] = field(default_factory=list)
     snippet: str = ""
+    affinity: list[float] = field(default_factory=list)
+    """8-dim L1-normalised harmonic affinity vector — carried for shard feedback."""
 
 
 @dataclass
@@ -348,6 +350,8 @@ def run_find(
             headings=doc["headings"][:5],
             wikilinks=doc["wikilinks"][:8],
             snippet=snippet,
+            # Affinity carried for shard feedback injection.
+            affinity=[round(float(v), 6) for v in affinities[idx]],
         ))
 
     # ---- Re-rank → operator_3 → answer -------------------------------------
