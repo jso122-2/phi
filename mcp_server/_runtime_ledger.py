@@ -112,6 +112,11 @@ TOOL_FAMILY: Final[dict[str, str]] = {
     "cairrn_batch_run":    "cairrn",
     "cairrn_neuro_k":      "cairrn",
     "temporal_record":     "cairrn",
+    # ── graph (extended) ──────────────────────────────────────────────────
+    "vault_project":       "graph",
+    "graph_cairrn_topo":   "graph",
+    "vault_hub_state":     "graph",
+    "vault_migrate":       "graph",
     # ── system / meta (always allowed, no family gate) ────────────────────
     "dom_queue_state":     "system",
     "list_hooks":          "system",
@@ -123,8 +128,9 @@ TOOL_FAMILY: Final[dict[str, str]] = {
     "forecast_state":      "system",
     "session_audit":       "system",
     "watchdog_state":      "system",
-    "retrigger_warmups":   "system",
     "run_tests":           "system",
+    # phi_watchdog is slash-only; still classified for ledger correctness
+    "phi_watchdog":        "dispatch",
 }
 
 #: Families that require the session gate to be open before they can run.

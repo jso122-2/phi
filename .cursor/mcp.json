@@ -5,6 +5,7 @@
       "command": "python3",
       "args": ["-m", "mcp_server.cloud"],
       "env": {
+        "PYTHONPATH": "/workspace",
         "PYTHONUNBUFFERED": "1",
         "SPOTIFY_RIP_MCP_NAME": "phi",
         "SPOTIFY_RIP_CLOUD_MCP": "1"

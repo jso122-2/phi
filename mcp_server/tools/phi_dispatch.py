@@ -259,7 +259,8 @@ def phi_flush() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool()
+# Slash-only — kept out of @mcp.tool() to respect the 60-tool Cursor catalog cap.
+# Call via run_command("/phi-watchdog") or run_command("/phi-watchdog clear=true").
 @requires_init
 def phi_watchdog(clear: bool = False) -> dict[str, Any]:
     """

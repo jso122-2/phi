@@ -61,3 +61,19 @@ if load_errors:
         f"{list(load_errors)}",
         file=sys.stderr,
     )
+
+# Runtime cap check — warn loudly so CI / test output catches regressions.
+try:
+    from mcp_server._state import mcp as _mcp
+    _registered = len(_mcp._tool_manager.list_tools())
+    if _registered > CURSOR_MCP_TOOL_CAP:
+        print(
+            f"[mcp_server.tools] WARNING: {_registered} tools registered — "
+            f"exceeds Cursor cap of {CURSOR_MCP_TOOL_CAP}. "
+            "Cursor will truncate the list; late-loaded tools become invisible. "
+            "Move excess tools to slash-only (run_command) to stay under cap.",
+            file=sys.stderr,
+            flush=True,
+        )
+except Exception:
+    pass

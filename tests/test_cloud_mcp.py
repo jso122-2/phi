@@ -126,8 +126,9 @@ def test_cloud_stdio_lists_search_tools():
         assert "find_query" in names, sorted(names)
         assert "psspps_query" in names, sorted(names)
         assert "session_audit" in names, sorted(names)
-        assert "phi_watchdog" in names, sorted(names)
-        assert len(names) <= 70   # catalog grows; keep a reasonable ceiling
+        # phi_watchdog is slash-only (run_command) to stay under the 60-tool cap
+        assert "phi_watchdog" not in names, "phi_watchdog must stay slash-only"
+        assert len(names) <= 60, f"Tool count {len(names)} exceeds Cursor cap of 60: {sorted(names)}"
     finally:
         proc.terminate()
         try:

@@ -56,9 +56,85 @@ def _try_bus_host():
         return None
 
 
+def _print_cloud_telemetry() -> None:
+    """
+    Print structured startup telemetry to stderr so the MCP console shows
+    the cloud environment state before the first tool call.
+
+    Covers:
+    - Registered tool count vs Cursor cap (60)
+    - House map completeness (tools not in any named house → overflow)
+    - Bus worker availability
+    - PYTHONPATH / entrypoint confirmation
+    """
+    import os
+    from mcp_server._state import mcp as _mcp
+    from mcp_server.dom_queue import DOMRequestQueue
+    from mcp_server._state import _dom_queue
+
+    # Tool count
+    try:
+        tools = _mcp._tool_manager.list_tools()
+        n_tools = len(tools)
+        cap = 60
+        cap_ok = n_tools <= cap
+        cap_flag = "✓" if cap_ok else f"✗ OVER by {n_tools - cap}"
+        print(
+            f"[cloud:telemetry] tools={n_tools}/{cap} {cap_flag}",
+            file=sys.stderr, flush=True,
+        )
+        if not cap_ok:
+            tool_names = sorted(t.name for t in tools)
+            print(
+                f"[cloud:telemetry] tool list: {tool_names}",
+                file=sys.stderr, flush=True,
+            )
+    except Exception as exc:
+        print(f"[cloud:telemetry] tool count failed: {exc}", file=sys.stderr, flush=True)
+
+    # House map completeness
+    try:
+        if hasattr(_dom_queue, "_houses") and _dom_queue._houses:
+            all_mapped: set[str] = set()
+            for h in _dom_queue._houses.values():
+                all_mapped.update(h.tools)
+            overflow = [t.name for t in tools if t.name not in all_mapped]
+            if overflow:
+                print(
+                    f"[cloud:telemetry] overflow (no house): {sorted(overflow)}",
+                    file=sys.stderr, flush=True,
+                )
+            else:
+                print(
+                    f"[cloud:telemetry] house map: all {n_tools} tools routed ✓",
+                    file=sys.stderr, flush=True,
+                )
+    except Exception as exc:
+        print(f"[cloud:telemetry] house map check failed: {exc}", file=sys.stderr, flush=True)
+
+    # Bus
+    try:
+        from mcp_server.bus.client import get_client, worker_alive
+        bus_up = get_client() is not None and worker_alive()
+        print(
+            f"[cloud:telemetry] bus={'up ✓' if bus_up else 'down — in-process fallback active'}",
+            file=sys.stderr, flush=True,
+        )
+    except Exception:
+        print("[cloud:telemetry] bus=unknown", file=sys.stderr, flush=True)
+
+    # Env
+    pythonpath = os.environ.get("PYTHONPATH", "(not set)")
+    print(
+        f"[cloud:telemetry] PYTHONPATH={pythonpath}  entrypoint=mcp_server.cloud",
+        file=sys.stderr, flush=True,
+    )
+
+
 def main() -> None:
     host = None
     try:
+        _print_cloud_telemetry()
         host = _try_bus_host()
         try:
             from mcp_server.bus.guardian import ensure_guardian
