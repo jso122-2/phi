@@ -1,4 +1,4 @@
-"""Cloud MCP: in-process search when the mmap bus is down."""
+"""Cloud MCP: in-process search when the mmap bus is down + spawn gate protocol."""
 from __future__ import annotations
 
 import json
@@ -133,3 +133,108 @@ def test_cloud_stdio_lists_search_tools():
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(timeout=2)
+
+
+# ---------------------------------------------------------------------------
+# Spawn gate unit tests (no subprocess — in-process, isolated via monkeypatch)
+# ---------------------------------------------------------------------------
+
+def test_spawn_gate_hook_registered_after_startup_init(monkeypatch):
+    """_startup_init registers the spawn_gate hook in the hook chain."""
+    import importlib
+    import mcp_server._spawn_gate as sg_mod
+    import mcp_server.hooks as hooks_mod
+
+    # Reset spawn state so the test runs clean
+    monkeypatch.setattr(sg_mod, "_spawn_complete", __import__("threading").Event())
+    monkeypatch.setattr(sg_mod, "_hook_registered", __import__("threading").Event())
+
+    # Re-register via the public function
+    sg_mod._register_spawn_gate()
+
+    names = {h.name for h in hooks_mod.REGISTRY._chain}
+    assert "spawn_gate" in names, f"spawn_gate not in hook chain: {names}"
+
+
+def test_emit_spawn_context_idempotent(monkeypatch, tmp_path):
+    """emit_spawn_context() fires only once; second call is a no-op."""
+    import mcp_server._spawn_gate as sg_mod
+
+    # Redirect session dir to tmp
+    call_count = []
+
+    original_emit = sg_mod._emit_spawn_banner
+    def counting_emit(init, ctx):
+        call_count.append(1)
+        original_emit(init, ctx)
+
+    monkeypatch.setattr(sg_mod, "_spawn_complete", __import__("threading").Event())
+    monkeypatch.setattr(sg_mod, "_emit_spawn_banner", counting_emit)
+
+    sg_mod.emit_spawn_context()
+    sg_mod.emit_spawn_context()   # second call — must be no-op
+    sg_mod.emit_spawn_context()   # third call — also no-op
+
+    assert len(call_count) == 1, f"emit_spawn_banner called {len(call_count)} times, want 1"
+
+
+def test_spawn_gate_hook_blocks_ungated_call(monkeypatch):
+    """spawn_gate hook raises HookViolation when gate is not open and a substantive tool is called."""
+    import threading
+    import mcp_server._spawn_gate as sg_mod
+    from mcp_server.hooks import HookViolation
+
+    # Reset spawn state
+    monkeypatch.setattr(sg_mod, "_spawn_complete", threading.Event())
+    monkeypatch.setattr(sg_mod, "_spawn_lock", threading.Lock())
+
+    # Gate NOT open
+    monkeypatch.setattr("mcp_server._gate._session_initialized", False)
+
+    import pytest
+    with pytest.raises(HookViolation, match="spawn_gate"):
+        # Simulate the hook firing on a substantive tool call
+        sg_mod.spawn_gate_hook = None   # will be replaced below
+        # Re-register to get a fresh closure
+        monkeypatch.setattr(sg_mod, "_hook_registered", threading.Event())
+        from mcp_server.hooks import REGISTRY
+        # Grab the last registered spawn_gate hook fn directly
+        sg_mod._register_spawn_gate()
+        hook_fn = next(h.fn for h in reversed(REGISTRY._chain) if h.name == "spawn_gate")
+        hook_fn("psspps_query", {})
+
+
+def test_spawn_gate_hook_allows_init_check_without_gate(monkeypatch):
+    """spawn_gate hook does NOT raise for init_check even when gate is closed."""
+    import threading
+    import mcp_server._spawn_gate as sg_mod
+
+    monkeypatch.setattr(sg_mod, "_spawn_complete", threading.Event())
+    monkeypatch.setattr(sg_mod, "_spawn_lock", threading.Lock())
+    monkeypatch.setattr("mcp_server._gate._session_initialized", False)
+    monkeypatch.setattr(sg_mod, "_hook_registered", threading.Event())
+
+    from mcp_server.hooks import REGISTRY
+    sg_mod._register_spawn_gate()
+    hook_fn = next(h.fn for h in reversed(REGISTRY._chain) if h.name == "spawn_gate")
+
+    # Should not raise — init_check is exempt from the gate check
+    hook_fn("init_check", {})
+
+
+def test_spawn_context_dict_contains_live_init(monkeypatch, tmp_path):
+    """spawn_context_dict() returns spawned=True and live_init content."""
+    import mcp_server._spawn_gate as sg_mod
+
+    fake_init = "# Session Init\n\n- hub: HOME\n- activation: 0.7"
+    (tmp_path / "live-init.md").write_text(fake_init, encoding="utf-8")
+
+    monkeypatch.setattr(
+        sg_mod,
+        "_read_live_init_content",
+        lambda: fake_init,
+    )
+
+    ctx = sg_mod.spawn_context_dict()
+    assert ctx["spawned"] is True
+    assert ctx["live_init"] == fake_init

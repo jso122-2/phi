@@ -77,6 +77,19 @@ def init_check() -> dict[str, Any]:
         results["tool_load_errors"] = tool_load_errors
         results["startup_ok"] = startup_ok
         results["init_account"] = _init_account_path()
+
+        # Spawn gate: include session context in the init_check response so
+        # the agent receives live-init.md content directly in the tool result.
+        # emit_spawn_context() was already called eagerly at server startup;
+        # this covers the case where the agent calls init_check() before the
+        # eager emit has fired or when running in a non-cloud context.
+        try:
+            from mcp_server._spawn_gate import emit_spawn_context, spawn_context_dict
+            emit_spawn_context()   # idempotent — no-op if already emitted
+            results["spawn_context"] = spawn_context_dict()
+        except Exception:
+            pass
+
         return results
 
 

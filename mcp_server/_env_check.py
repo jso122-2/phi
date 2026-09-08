@@ -120,5 +120,8 @@ def _startup_init() -> None:
             _register_sim_guard()
             _register_temporal_graph_guard()
             _register_command_dispatch()
+            # Spawn gate — must be last so it fires after all guards are wired.
+            from mcp_server._spawn_gate import _register_spawn_gate
+            _register_spawn_gate()
     except Exception as exc:
         print(f"[mcp_server._gate] startup init failed: {exc}", file=sys.stderr)

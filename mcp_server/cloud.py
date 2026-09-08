@@ -33,6 +33,15 @@ if not is_initialized():
     # Cloud images may miss optional CAIRRN imports; search still needs the gate.
     open_gate()
 
+# Layer 2: eagerly emit live-init.md to stderr so the spawn context appears
+# in the MCP console even before the first tool call arrives.
+try:
+    from mcp_server._spawn_gate import _register_spawn_gate, emit_spawn_context
+    _register_spawn_gate()   # idempotent — no-op if _startup_init already ran it
+    emit_spawn_context()
+except Exception as _sg_exc:
+    print(f"[mcp_server.cloud] spawn gate skipped: {_sg_exc}", file=sys.stderr)
+
 
 def _try_bus_host():
     """Start the mmap worker when possible; search falls back in-process if not."""
