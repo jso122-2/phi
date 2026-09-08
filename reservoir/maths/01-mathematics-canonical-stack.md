@@ -1,11 +1,11 @@
 # 📐 Mathematics — Canonical Stack
 
 *Source: Notion — Welcome to Notion / Reservoir / 📐 Mathematics — Canonical Stack*
-*Last edited in Notion: 2026-09-02*
+*Last edited in Notion: 2026-09-02 · Layer 10 committed from local phi/ 2026-09-08*
 
 This page is law. The formulas here are the authoritative versions. Anything that conflicts with what's written here is wrong. Anything not yet here is provisional until committed.
 
-The stack is ordered chronologically by derivation, not by importance. All layers are active simultaneously. The system runs all of them.
+The stack is ordered chronologically by derivation, not by importance. All layers are active simultaneously. The system runs all of them. Layers 0–9 are the Notion export. Layer 10 is the phi player/library graph that was on disk and unused by that export.
 
 ---
 
@@ -480,6 +480,73 @@ PS, PSI, and E-A form a closed regulatory loop: PS detects dark nodes → PSI bo
 
 ---
 
+## Layer 10 — Phi Player / Library Graph (on-disk, committed 2026-09-08)
+
+The Notion export never ingested `phi/`. These formulas were already running. Full restatement: `13-phi-codebase-formalisation.md`.
+
+**Session fit**
+
+```
+C_E = Σ w_k x_k
+```
+
+Helm mix (genre 0.28, mood 0.28, novelty 0.23, elo 0.13, phi_rank 0.08), buoyancy-scaled, then TP-RAR keep/fill, then Cc keep/fill.
+
+**Buoyancy**
+
+```
+B = clamp((coverage + agreement) / 2, 0, 1)
+```
+
+**Helm floor**
+
+```
+helm_scale = max(0.50, B)
+```
+
+**Novelty (inverted shimmer)**
+
+```
+N = 1 − e^{−days · ln 2 / t½}      t½ = 14 d
+```
+
+Never-heard = 0.85. Exponential in unused time, *rewards* freshness. Dual of Ns2.
+
+**Ash yield (phi cap)**
+
+```
+A_yield = min(32, 8 · e^{0.20 · max(0, T − 3)})
+```
+
+**Dragon D4**
+
+```
+D4_A = ‖D3‖ / ‖D1‖ − D2
+D4_B = |D3 · d_⊥| / ‖D1‖ − D2_⊥
+```
+
+**Arc continuation**
+
+```
+S_arc = 1 / (1 + |d4_a − (level + slope)| · 0.1)
+```
+
+**Euler + basin**
+
+```
+χ = V − E + T
+T_B = A_xG · |BSH| / max(T, 1) − |BHD − 1|
+α_ret = 0.5 + 0.5 · tanh(T_B / V²)
+```
+
+**Coherence energy**
+
+```
+E_coh = −α·J(h) + β·hᵀLh + γ·Φ(dA) + δ·Ω(h) + ε·χ(G)
+```
+
+---
+
 ## Cross-Layer Laws
 
 These are not observations. They are structural constraints that apply across all layers.
@@ -498,6 +565,10 @@ These are not observations. They are structural constraints that apply across al
 
 **Law 7 — Deeply negative Ns2 = drain candidate.** Not an error. A signal. Deeply suppressed nodes are candidates for archival or pruning. The system identifies its own dead weight.
 
+**Law 8 — Phi novelty is the dual of Ns2, not a synonym.** Both are exponential in unused time. Ns2 suppresses unused *shards*. Phi N promotes unused *tracks*. Same move, opposite retrieval policy. Do not substitute.
+
+**Law 9 — Helm never cedes to ELO.** Buoyancy scales genre/mood/phi_rank and floors them at half prior. Sparse catalog must not renormalise novelty/ELO into heading.
+
 ---
 
 ## Source pages (archived originals — do not edit)
@@ -511,3 +582,4 @@ These are not observations. They are structural constraints that apply across al
 - `Artifical Anderson Schema Logic Matrix 19_5_25` → `08-anderson-schema-logic-matrix.md`
 - `Gemini 15-12-25 (happy Ana-Chi day)` → `09-gemini-ana-chi-attractor-states.md`
 - `Notion Data Stream — Score Formalisation` → `10-notion-data-stream-score-formalisation.md`
+- `Phi Codebase — Score Formalisation` → `13-phi-codebase-formalisation.md`

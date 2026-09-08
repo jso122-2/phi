@@ -21,7 +21,7 @@
 #   phi_hubs      — phi CAIRRN ring (agent-context→0, CODE→1, HOME→2, MATH→3, COMMANDS→7)
 
 schema_version: "1.1.0"
-updated: 2026-08-20
+updated: 2026-09-08
 total_formulas_note: "count is the length of the formulas list; regenerate FORMULAS.md from this file"
 
 value_systems:
@@ -1869,3 +1869,145 @@ formulas:
     layer: 1
     value_system: mycelial
     source: workers/cairrn/mycelial.py
+
+  - id: F_SESSION_FIT
+    label: Phi Session-Fit Confidence
+    expr: "C_E = sum w_k x_k"
+    variables:
+      w_genre: helm_genre_weight
+      w_mood: helm_mood_weight
+      w_novelty: novelty_weight
+      w_elo: elo_weight
+      w_phi: phi_rank_weight
+    output: C_E
+    layer: X
+    source: phi/core/ranker/_track.py
+    code:
+      - phi.core.ranker.TrackRanker.score
+
+  - id: F_BUOYANCY
+    label: Catalog Buoyancy
+    expr: "B = clamp((coverage + agreement) / 2, 0, 1)"
+    variables:
+      coverage: catalog_arms_over_four
+      agreement: mean_bpm_mood_genre_confirm
+    output: B
+    layer: X
+    source: phi/meta/consensus.py
+    code:
+      - phi.meta.consensus.buoyancy_score
+
+  - id: F_HELM_WEIGHTS
+    label: Helm Floor Weight Mix
+    expr: "helm_scale = max(0.50, B); w_helm *= helm_scale; w = w / sum(w)"
+    variables:
+      B: buoyancy
+      HELM_FLOOR: helm_floor
+    output: w
+    layer: X
+    source: phi/core/ranker/_scoring.py
+    code:
+      - phi.core.ranker._scoring._confidence_weights
+
+  - id: F_NOVELTY
+    label: Phi Novelty Half-Life
+    expr: "N = min(1, 1 - exp(-days * ln2 / t_half))"
+    variables:
+      days: days_since_last_played
+      t_half: novelty_half_life
+    output: N
+    layer: 1
+    source: phi/core/ranker/_scoring.py
+    code:
+      - phi.core.ranker._scoring._novelty_score
+
+  - id: F_D4_A
+    label: Dragon Norm-Ratio Score
+    expr: "D4_A = ||D3|| / ||D1|| - D2"
+    variables:
+      D1: nearest_segment_direction
+      D2: next_segment_midpoint_y
+      D3: next_segment_endpoint
+    output: D4_A
+    layer: 2
+    source: phi/models/dragon_curve.py
+    code:
+      - phi.models.dragon_curve.DragonCurve.score_a
+
+  - id: F_D4_B
+    label: Dragon Fold Projection Score
+    expr: "D4_B = |D3 · d_perp| / ||D1|| - D2_perp"
+    variables:
+      D1: nearest_segment_direction
+      D2: next_segment_midpoint_y
+      D3: next_segment_endpoint
+      d_perp: unit_normal_to_D1
+    output: D4_B
+    layer: 2
+    source: phi/models/dragon_curve.py
+    code:
+      - phi.models.dragon_curve.DragonCurve.score_b
+
+  - id: F_ARC_CONTINUATION
+    label: Arc Continuation Score
+    expr: "S_arc = 1 / (1 + |d4_a - (level + slope)| * 0.1)"
+    variables:
+      d4_a: candidate_d4_a
+      level: mean_recent_d4_a
+      slope: linregress_last_8
+    output: S_arc
+    layer: X
+    source: phi/engine/arc_scorer.py
+    code:
+      - phi.engine.arc_scorer.ArcScorer.score_candidate
+
+  - id: F_EULER_CHI
+    label: Euler Characteristic
+    expr: "chi = V - E + T"
+    variables:
+      V: vertex_count
+      E: edge_count
+      T: triangle_count
+    output: chi
+    layer: 3
+    source: phi/topology/primitives.py
+    code:
+      - phi.topology.primitives.TopologicalInvariant.from_counts
+
+  - id: F_BASIN_SEQUESTRATION
+    label: Basin Sequestration Score
+    expr: "T_B = A_xG * |BSH| / max(T, 1) - |BHD - 1|"
+    variables:
+      A_xG: cross_graph_area
+      BSH: basin_sequestration_height
+      BHD: basin_hole_depth
+      T: triangle_count
+    output: T_B
+    layer: 3
+    source: phi/topology/primitives.py
+    code:
+      - phi.topology.primitives.TopologicalInvariant.basin_sequestration
+
+  - id: F_T_B_ALPHA
+    label: Basin to Retrieval Locality
+    expr: "alpha = 0.5 + 0.5 * clamp(t_b_norm, -1, 1)"
+    variables:
+      t_b_norm: tanh_T_B_over_V2
+    output: alpha_ret
+    layer: 3
+    source: graph/topology_index.py
+    code:
+      - graph.topology_index.t_b_to_alpha
+
+  - id: F_COH_ENERGY
+    label: GNN Coherence Energy
+    expr: "E_coh = -alpha*J(h) + beta*h^T L h + gamma*Phi(dA) + delta*Omega(h) + epsilon*chi(G)"
+    variables:
+      J: negentropy
+      L: graph_laplacian
+      Phi: lyapunov_ssm
+      Omega: layer_kl
+      chi: euler_characteristic
+    output: E_coh
+    layer: 3
+    source: phi/gnn/coherence.py
