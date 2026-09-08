@@ -76,18 +76,18 @@ from phi.ui.qt.rooms.forge_room     import MLForgePage
 from phi.ui.qt.rooms.studio_room    import MLStudioPage
 
 
-# ── Z-spine rooms (to be populated in a future session) ───────────────────────
+# ── Z-spine rooms ─────────────────────────────────────────────────────────────
 
-class ZSpinePage(StubRoom):
-    """Placeholder for the first page of the z-spine.
+try:
+    from phi.ui.qt.rooms.discovery_room import DiscoveryRoom as ZSpinePage
+except Exception as _disc_exc:  # noqa: BLE001
+    import sys as _sys
+    print(f"[phi.ui.qt.rooms] discovery_room failed to load: {_disc_exc}", file=_sys.stderr)
 
-    Swap this out for a real QWidget once the z-spine content is defined.
-    The room-protocol surface (on_show, on_refresh, sync_transport, …) is
-    already satisfied by StubRoom.
-    """
-
-    def __init__(self, parent: QWidget | None = None, ctrl: object = None) -> None:
-        super().__init__("Z  /  …", ctrl, parent)
+    class ZSpinePage(StubRoom):  # type: ignore[no-redef]
+        """Fallback stub if DiscoveryRoom fails to import (e.g. PySide6 absent)."""
+        def __init__(self, parent: QWidget | None = None, ctrl: object = None) -> None:
+            super().__init__("Z  /  DISCOVERY", ctrl, parent)
 
 
 __all__ = [
