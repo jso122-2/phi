@@ -231,6 +231,9 @@ class HarmonicIndex:
         # Last vault-topology fusion (None until graph_topo_hubs applies).
         self.last_t_b_norm: float | None = None
         self.last_chi: float | None = None
+        # Goal-directed propagation state (None until set_goal is called).
+        self._goal: np.ndarray | None = None
+        self._goal_strength: float = 0.1
         # RLock so methods can safely call each other without deadlocking
         self._lock = threading.RLock()
 
@@ -350,6 +353,8 @@ class HarmonicIndex:
             "isometric"  — true isometric cosine-modulated decay (IsometricCosinePropagator);
                            full bipolar cosine kernel, dissipative (total activation decays),
                            all-to-all coupling in ONE hop expands path space to N^k
+            "goal"       — local diffusion blended with gradient pull toward the goal
+                           vector set by set_goal().  Raises ValueError if no goal is set.
         """
         if mode == "resonance":
             propagator = self._resonance_propagator
@@ -357,16 +362,116 @@ class HarmonicIndex:
             propagator = self._propagator
         elif mode == "isometric":
             propagator = self._isometric_propagator
+        elif mode == "goal":
+            with self._lock:
+                if self._goal is None:
+                    raise ValueError("No goal set — call set_goal() first")
+                for _ in range(steps):
+                    # Phase 1: local diffusion
+                    self._propagator.step(self.shards)
+                    # Phase 2: gradient pull toward goal vector.
+                    # delta_i = goal_i - activation_i; each shard moves
+                    # goal_strength fraction of the way toward its target.
+                    activations = np.array([s.activation for s in self.shards], dtype=float)
+                    delta = self._goal - activations
+                    for i, shard in enumerate(self.shards):
+                        shard.activation += float(self._goal_strength * delta[i])
+                    self._step_count += 1
+            return
         else:
             raise ValueError(
                 f"Unknown propagation mode {mode!r}; "
-                "expected 'local', 'resonance', or 'isometric'"
+                "expected 'local', 'resonance', 'isometric', or 'goal'"
             )
 
         with self._lock:
             for _ in range(steps):
                 propagator.step(self.shards)
                 self._step_count += 1
+
+    def set_goal(
+        self,
+        target: int,
+        value: float = 1.0,
+        goal_strength: float = 0.1,
+    ) -> np.ndarray:
+        """
+        Set the goal vector for goal-directed propagation.
+
+        The goal is a one-hot activation vector: the target shard receives
+        ``value``, all others receive 0.  Subsequent ``propagate(mode='goal')``
+        calls blend local diffusion with a gradient pull of strength
+        ``goal_strength`` per step toward this target.
+
+        Parameters
+        ----------
+        target        : 0-based shard index to attract toward
+        value         : activation magnitude at the target shard (default 1.0)
+        goal_strength : γ ∈ (0, 1) — per-step gradient pull (default 0.1)
+
+        Returns the goal vector as a numpy array.
+        """
+        n = len(self.shards)
+        goal_vec = np.zeros(n, dtype=float)
+        goal_vec[target % n] = float(value)
+        with self._lock:
+            self._goal = goal_vec
+            self._goal_strength = float(np.clip(goal_strength, 1e-6, 1.0 - 1e-6))
+        return goal_vec
+
+    def clear_goal(self) -> None:
+        """Clear the current goal vector. propagate(mode='goal') will error until set_goal() is called again."""
+        with self._lock:
+            self._goal = None
+            self._goal_strength = 0.1
+
+    def ana_chi_modulate(self, chi: float, scale: float = 0.3) -> dict:
+        """
+        Modulate shard activations by the Ana-Chi coherence field at chi.
+
+        Each CAIRRN hub maps to one of the five Ana-Chi basins (HOME →
+        true_center, MATH → white_peak, CODE → mirror, COMMANDS → escape,
+        agent-context → boundary).  The basin proximity at ``chi`` —
+        ``exp(-|chi - chi_basin| / σ)`` — determines what fraction of
+        ``scale`` activation is routed to that hub's shards.
+
+        This closes the loop: an Ana-Chi sim that settles at chi ≈ 1.5414
+        (HOME) strengthens HOME shards; one that escapes to 2.67 (COMMANDS)
+        energises the COMMANDS shard instead.
+
+        Parameters
+        ----------
+        chi   : final Ana-Chi position from the simulation
+        scale : total activation injected across all shards (default 0.3)
+
+        Returns a dict with chi, per-basin proximities, and per-shard deltas.
+        """
+        from sims.ana_chi import BASINS, HUB_BASIN
+
+        # Basin proximity weights at this chi
+        basin_proximity = {b.name: b.proximity(chi) for b in BASINS}
+        total_prox = sum(basin_proximity.values()) or 1.0
+
+        with self._lock:
+            modulations: dict[str, float] = {}
+            for hub, shard_indices in HUB_SHARD_MAP.items():
+                basin_name = HUB_BASIN.get(hub)
+                if not basin_name:
+                    continue
+                prox = basin_proximity.get(basin_name, 0.0)
+                # Proportional share of total injection for this hub's shards
+                per_shard = scale * (prox / total_prox) / max(len(shard_indices), 1)
+                for idx in shard_indices:
+                    self.shards[idx].activation += per_shard
+                    modulations[f"shard_{idx}"] = round(per_shard, 6)
+            self.last_chi = chi
+
+        return {
+            "chi": round(chi, 6),
+            "scale": scale,
+            "basin_proximity": {k: round(v, 6) for k, v in basin_proximity.items()},
+            "shard_modulations": modulations,
+        }
 
     # ------------------------------------------------------------------
     # Inspection
