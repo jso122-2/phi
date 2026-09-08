@@ -489,6 +489,108 @@ def vault_project(node_id: str, force: bool = False) -> dict[str, Any]:
         return out
 
 
+# ---------------------------------------------------------------------------
+# Formula-driven edge scoring
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@requires_init
+def graph_edge_score(
+    stem_a:     str,
+    stem_b:     str,
+    hop_count:  int   = 1,
+    rag_O_N:    float = 1.0,
+    rag_P_risk: float = 1.0,
+) -> dict[str, Any]:
+    """
+    Compute the formula-driven edge activation score between two vault nodes.
+
+    Every numeric result goes through FormulaRegistry.call() — the math is
+    not hardcoded but driven by the formula_dictionary.yaml / Notion reservoir.
+    Formulas used:
+
+      F_COSINE_SIMILARITY — embedding cosine similarity between the two nodes
+      F_JACCARD_AFFINITY  — tag set overlap (|A∩B| / |A∪B|)
+      F_EDGE_WEIGHT       — reinforcement-weighted composite of the above
+      F_RAG_PRIORITY      — P_sps retrieval priority (X_norm/O_N − T_pos/P_risk)
+      F_PATH_COST         — traversal cost (hop_count × (1 − cosine_sim))
+
+    The formula_trace in the response shows which formula_id produced which
+    numeric value.  If a formula was updated via sync_notion() since the last
+    server start, the new expression is used automatically.
+
+    Parameters
+    ----------
+    stem_a / stem_b   Vault node stems (filename without extension).
+                      Examples: "harmonic-index", "MATH", "mfpt".
+    hop_count         Graph distance between the nodes (default 1 for direct link).
+    rag_O_N           System complexity denominator for F_RAG_PRIORITY.
+    rag_P_risk        Perplexity risk denominator for F_RAG_PRIORITY.
+
+    Returns
+    -------
+    dict with:
+        ok              True on success.
+        stem_a/b        Echoed stems.
+        cosine_sim      F_COSINE_SIMILARITY result.
+        jaccard         F_JACCARD_AFFINITY result.
+        edge_weight     F_EDGE_WEIGHT result.
+        rag_priority    F_RAG_PRIORITY result (P_sps).
+        path_cost       F_PATH_COST result.
+        composite       Normalised edge activation strength [0, 1].
+        formula_trace   formula_id → value for every formula used.
+        fallback_used   True if registry was unavailable (no YAML / PyYAML).
+    """
+    with _dom_queue.gate("graph_edge_score"):
+        try:
+            from graph.node import VaultNode, load_vault
+            from graph.edge_scorer import EdgeScorer
+            from psspps.scorer import build_tfidf, query_vector
+            from psspps.retriever import _clean
+
+            scorer = EdgeScorer(rag_O_N=rag_O_N, rag_P_risk=rag_P_risk, edge_hop=hop_count)
+
+            vault = load_vault()
+            idx   = {n.stem: n for n in vault}
+
+            if stem_a not in idx:
+                return {"ok": False, "error": f"stem_a '{stem_a}' not found in vault"}
+            if stem_b not in idx:
+                return {"ok": False, "error": f"stem_b '{stem_b}' not found in vault"}
+
+            node_a = idx[stem_a]
+            node_b = idx[stem_b]
+
+            # Build TF-IDF vectors as proxies for embeddings
+            texts = [
+                _clean(node_a.title + " " + node_a.text),
+                _clean(node_b.title + " " + node_b.text),
+            ]
+            mat, vocab = build_tfidf(texts)
+            vec_a = mat[0]
+            vec_b = mat[1]
+
+            tags_a = list(node_a.tags or [])
+            tags_b = list(node_b.tags or [])
+
+            edge = scorer.score_pair(
+                stem_a    = stem_a,
+                stem_b    = stem_b,
+                vec_a     = vec_a,
+                vec_b     = vec_b,
+                tags_a    = tags_a,
+                tags_b    = tags_b,
+                hop_count = hop_count,
+            )
+            result = edge.to_dict()
+            result["ok"] = True
+            return result
+
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc), "stem_a": stem_a, "stem_b": stem_b}
+
+
 # Slash-only — Cursor catalog cap 60. Run via run_command("/do vault-migrate").
 @requires_init
 def vault_migrate(batch_size: int = 50) -> dict[str, Any]:

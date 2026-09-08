@@ -41,6 +41,11 @@ F_PATH_REINFORCEMENT: >-
 F_PRESSURE_HEATMAP: >-
   sum(flow_i * weight_i for flow_i, weight_i in zip(flow_list, weight_list))
 
+# ── graph traversal cost — caller passes pre-computed scalar sim ─────────
+
+F_PATH_COST: >-
+  Hop_Count * (1 - sim)
+
 # ── set-intersection (Jaccard) — caller passes sets or lists ──────────────
 
 F_JACCARD_AFFINITY: >-
