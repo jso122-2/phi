@@ -25,7 +25,7 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
-from workers.cairrn import f_crystallisation
+from workers.cairrn import f_crystallisation, f_edge_volatility
 
 # ---------------------------------------------------------------------------
 # Shard registry — sourced from Notion workspace
@@ -71,6 +71,11 @@ SCORES_COLLECTION = "54c008d6-e791-4f26-ab48-11dfe7c8e796"
 # Per-shard Si memory for the f_crystallisation gate.
 # Keyed by shard_page_id → last Si value written to Notion.
 _r_node_prev: dict[str, float] = {}
+
+# Ring volatility gate (f_edge_volatility).
+# Suppresses notion.tick writes when the harmonic ring is too noisy.
+V_EDGE_SUPPRESS_THRESHOLD: float = 2.0   # tune as needed — ring is volatile above this
+_shard_activations_prev: list[float] = []  # activation vector from the last non-suppressed tick
 
 # CAIRRN hub → reservoir shard routing.
 # Keys are the live harmonic-index hub names (HOME / MATH / CODE / COMMANDS /
@@ -202,6 +207,33 @@ def notion_tick(
     token: Notion integration token (falls back to NOTION_TOKEN env var)
     dry_run: compute and return payload without writing to Notion
     """
+    global _shard_activations_prev
+
+    # --- Outer guard: ring volatility gate (f_edge_volatility) ---
+    # Must fire BEFORE the Si_delta gate (Phase C).  High V_edge means the
+    # harmonic ring is in a soot phase — routes shift faster than crystallisation
+    # can stabilise them.  Suppress the write and let the ring settle.
+    all_shard_names = list(SHARD_REGISTRY.keys())
+    activated_set = set(activated_shards)
+    cur_activations = [1.0 if s in activated_set else 0.0 for s in all_shard_names]
+    if _shard_activations_prev:
+        edge_deltas = [abs(c - p) for c, p in zip(cur_activations, _shard_activations_prev)]
+        v_edge = f_edge_volatility(edge_deltas, w=1.0)
+        if v_edge > V_EDGE_SUPPRESS_THRESHOLD:
+            return {
+                "ts": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "activated": activated_shards,
+                "dry_run": dry_run,
+                "suppressed": True,
+                "v_edge": round(v_edge, 6),
+                "reason": "ring_volatile",
+                "edges_written": [],
+                "scores_updated": [],
+                "si_skipped": [],
+                "errors": [],
+                "write_mode": "suppressed",
+            }
+
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     to_a = len(activated_shards)  # global sum after this tick
     results: dict[str, Any] = {
@@ -317,6 +349,8 @@ def notion_tick(
             })
 
     results["write_mode"] = "live" if can_write else ("dry-run" if dry_run else "no-token")
+    # Update ring snapshot for the next volatility check.
+    _shard_activations_prev = cur_activations
     return results
 
 

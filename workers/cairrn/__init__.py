@@ -147,6 +147,7 @@ from workers.cairrn.formulas import (
     f_scup_canonical,
     f_cc_energy_budget,
     f_crystallisation,
+    f_edge_volatility,
 )
 
 # --- Z-space scoring ---------------------------------------------------------
@@ -240,6 +241,7 @@ __all__ = [
     "f_scup_canonical",
     "f_cc_energy_budget",
     "f_crystallisation",
+    "f_edge_volatility",
     # z-space
     "ZScore",
     "compute_z_score",
