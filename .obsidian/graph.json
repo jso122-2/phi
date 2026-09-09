@@ -8,17 +8,38 @@
   "collapse-color-groups": false,
   "colorGroups": [
     {
-      "query": "path:vault/",
-      "color": {
-        "a": 1,
-        "rgb": 16711808
-      }
-    },
-    {
       "query": "path:sessions/",
       "color": {
         "a": 1,
         "rgb": 16711680
+      }
+    },
+    {
+      "query": "path:dawn/",
+      "color": {
+        "a": 1,
+        "rgb": 16737792
+      }
+    },
+    {
+      "query": "path:reservoir/",
+      "color": {
+        "a": 1,
+        "rgb": 11158783
+      }
+    },
+    {
+      "query": "path:keep/",
+      "color": {
+        "a": 1,
+        "rgb": 3381759
+      }
+    },
+    {
+      "query": "path:music/",
+      "color": {
+        "a": 1,
+        "rgb": 16729258
       }
     },
     {

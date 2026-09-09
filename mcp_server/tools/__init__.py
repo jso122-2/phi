@@ -41,6 +41,7 @@ _TOOL_MODULES = [
     "prefeed_shuffle",
     "phi_dispatch",
     "modular",
+    "notion_sync",
 ]
 
 load_errors: dict[str, str] = {}

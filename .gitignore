@@ -33,6 +33,9 @@ htmlcov/
 # Runtime mycelial / tracer logs (rewritten every tick)
 agent-log/*.txt
 
+# Runtime bus rings, job files, worker pids (ephemeral — rebuilt on server start)
+.runtime/
+
 # Harmonic index snapshot (runtime state, restored on server start)
 Spotify-rip/.harmonic-snapshot.json
 
@@ -74,3 +77,12 @@ scratch_*.py
 
 # macOS app bundle (machine-specific paths — regenerate with scripts/build_phi_app.sh)
 phi.app/
+
+# Obsidian personal workspace state (graph config is tracked, workspace layout is not)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+
+# DAWN runtime logs — contents ignored, directory tracked via dawn/.gitkeep
+dawn/blooms/
+dawn/ticks/
+dawn/tracers/
