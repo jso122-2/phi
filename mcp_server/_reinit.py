@@ -108,6 +108,85 @@ def _reinit_hot_loader() -> bool:
             return False
 
 
+def seed_hot_loader() -> None:
+    """
+    Register the startup warmup corpus in CAIRRNHotLoader and fire the first step.
+
+    Without this call, _hot_loader.total stays 0 at startup.  Every
+    retrigger_warmups() then signals keys that have never been registered —
+    the signal() calls all return False, step() touches nothing, and misses
+    accumulate silently.
+
+    Three entries are registered:
+      warmup:corpus  — pre-loads the PSSPPS vault retriever corpus
+      warmup:phi     — pre-builds the PhiTracerSession (phi_clip warm-up)
+      tools:retry    — retries any singleton that failed at startup
+    """
+    if _st._hot_loader is None:
+        return
+
+    # Only register entries that aren't already loaded (idempotent on re-call).
+    if _st._hot_loader.is_ready("warmup:corpus") and \
+       _st._hot_loader.is_ready("warmup:phi"):
+        return
+
+    def _load_corpus() -> dict:
+        try:
+            from psspps.retriever import get_vault_corpus
+            corpus = get_vault_corpus()
+            n = getattr(corpus, "n_docs", None)
+            print(f"[hot_loader] warmup:corpus loaded (n_docs={n})", file=sys.stderr)
+            return {"warmed": "corpus", "n_docs": n}
+        except Exception as exc:
+            print(f"[hot_loader] warmup:corpus failed: {exc}", file=sys.stderr)
+            return {"warmed": "corpus", "error": str(exc)}
+
+    def _load_phi() -> object:
+        try:
+            from mcp_server.tools.phi_clip import warmup_phi_clip
+            session = warmup_phi_clip()
+            if session is not None:
+                print("[hot_loader] warmup:phi loaded — phi_clip is warm", file=sys.stderr)
+            else:
+                print(
+                    "[hot_loader] warmup:phi: library absent — phi_clip_ready will stay false",
+                    file=sys.stderr,
+                )
+            return session
+        except Exception as exc:
+            print(f"[hot_loader] warmup:phi failed: {exc}", file=sys.stderr)
+            return None
+
+    def _load_tools_retry() -> dict:
+        try:
+            return _reinit_all_failed()
+        except Exception as exc:
+            print(f"[hot_loader] tools:retry failed: {exc}", file=sys.stderr)
+            return {}
+
+    _st._hot_loader.register(
+        "warmup:corpus",
+        signal_fn=lambda: True,
+        load_fn=_load_corpus,
+    )
+    _st._hot_loader.register(
+        "warmup:phi",
+        signal_fn=lambda: True,
+        load_fn=_load_phi,
+    )
+    _st._hot_loader.register(
+        "tools:retry",
+        signal_fn=lambda: bool(_st.startup_errors),
+        load_fn=_load_tools_retry,
+    )
+    _st._hot_loader.step()
+    print(
+        f"[mcp_server._reinit] hot_loader seeded "
+        f"({len(_st._hot_loader)} entries, step fired)",
+        file=sys.stderr,
+    )
+
+
 def _reinit_all_failed() -> dict[str, bool]:
     """
     Re-init every singleton currently in startup_errors.

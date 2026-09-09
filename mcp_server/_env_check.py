@@ -120,5 +120,7 @@ def _startup_init() -> None:
             _register_sim_guard()
             _register_temporal_graph_guard()
             _register_command_dispatch()
+            from mcp_server._reinit import seed_hot_loader
+            seed_hot_loader()
     except Exception as exc:
         print(f"[mcp_server._gate] startup init failed: {exc}", file=sys.stderr)

@@ -1,6 +1,7 @@
 """phi_clip — MCP tool: gemini_clip (Stage III track clipper via P_sps)."""
 from __future__ import annotations
 
+import sys
 import threading
 from typing import Any, Optional
 
@@ -29,6 +30,12 @@ def _get_session() -> Optional[Any]:
             return _session
         from phi.library import LIBRARY_ROOT
         if not LIBRARY_ROOT.exists():
+            print(
+                f"[phi_clip] LIBRARY_ROOT not found at {LIBRARY_ROOT} — "
+                "phi_clip will remain cold until the Liked Songs library is ripped. "
+                "Run the rip pipeline or point SPOTIFY_RIP_LIBRARY_ROOT at an existing library.",
+                file=sys.stderr,
+            )
             return None
         from engine.phi_session import make_phi_session
         _session = make_phi_session()
@@ -53,6 +60,24 @@ def _get_clipper(top_k: int, alpha: float) -> Optional[Any]:
 def is_warmed() -> bool:
     """True once the PhiTracerSession has been built and the snapshot is ready."""
     return _session is not None
+
+
+def warmup_phi_clip() -> Optional[Any]:
+    """
+    Attempt to build the PhiTracerSession eagerly.
+
+    Safe to call from a background thread at server startup. Returns the session
+    on success, None if the library is absent (degraded-but-stable).
+    Never raises — exceptions are caught and logged so startup is not blocked.
+    """
+    try:
+        return _get_session()
+    except Exception as exc:
+        print(
+            f"[phi_clip] warmup failed: {exc} — phi_clip will remain cold.",
+            file=sys.stderr,
+        )
+        return None
 
 
 # ---------------------------------------------------------------------------
