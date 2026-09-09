@@ -31,6 +31,7 @@ from workers.cairrn import (
     f_shimmer_decay,
     f_shimmer_base,
     f_ash_yield,
+    f_volcanic_ash,
 )
 
 # ---------------------------------------------------------------------------
@@ -284,6 +285,7 @@ def notion_tick(
                 "shimmer_base": {},
                 "ash_yield": 0.0,
                 "ash_drain_count": {},
+                "volcanic_ash": {},
                 "errors": [],
                 "write_mode": "suppressed",
             }
@@ -311,6 +313,7 @@ def notion_tick(
         "shimmer_base": {},
         "ash_yield": ash,
         "ash_drain_count": _ash_drain_count.copy(),
+        "volcanic_ash": {},
         "errors": [],
     }
 
@@ -365,6 +368,17 @@ def notion_tick(
 
         # Capture crystallisation seed diagnostic per shard.
         results["shimmer_base"][name] = scores.get("shimmer_base", 0.0)
+
+        # Volcanic ash (f_volcanic_ash) — nutrient-flow reinforcement per shard.
+        # σ = shimmer_base (sigmoid-like gate from f_shimmer_base)
+        # N_flow = Ns1 (primary edge activation × index score — proxy for flow)
+        # dt = 1.0 (one tick step)
+        voc = f_volcanic_ash(
+            sigma=scores.get("shimmer_base", 0.0),
+            N_flow=scores.get("Ns1", 0.0),
+            dt=1.0,
+        )
+        results["volcanic_ash"][name] = round(voc, 6)
 
         score_patch = {
             "Qe": {"number": qe},
