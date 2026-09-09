@@ -25,7 +25,7 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
-from workers.cairrn import f_crystallisation, f_edge_volatility, f_shimmer_decay
+from workers.cairrn import f_crystallisation, f_edge_volatility, f_shimmer_decay, f_shimmer_base
 
 # ---------------------------------------------------------------------------
 # Shard registry — sourced from Notion workspace
@@ -81,6 +81,7 @@ _shard_activations_prev: list[float] = []  # activation vector from the last non
 # shimmer_t = A · exp(−λ · t) + p · φ_hysteresis
 SHIMMER_LAM: float = 0.1   # decay rate λ — controls how fast the floor drops with Et
 SHIMMER_PHI: float = 0.2   # hysteresis factor φ — scales the pressure floor
+SHIMMER_EPS: float = 0.05  # epsilon — width of the f_shimmer_base delta window
 
 # CAIRRN hub → reservoir shard routing.
 # Keys are the live harmonic-index hub names (HOME / MATH / CODE / COMMANDS /
@@ -150,12 +151,25 @@ def compute_scores(
     ns2 = max(ns2, shimmer_floor)
     ns3 = abs(ta - to_a) / max(ss, 0.01)
     cls = _classify(ns1, ns2, ns3, qe, qe_adj)
+    # Crystallisation seed (f_shimmer_base) — diagnostic output.
+    # Fires when the shimmer amplitude is near the reference tracking point.
+    #   tp_rar_t  = shimmer_floor (the f_shimmer_decay output — reference point)
+    #   decay_coef = SHIMMER_LAM * et  (accumulated decay)
+    shimmer_base_val = f_shimmer_base(
+        A=_shimmer_A,
+        tp_rar_t=shimmer_floor,
+        eps=SHIMMER_EPS,
+        decay_coef=SHIMMER_LAM * et,
+        p=0.5,
+        phi_hysteresis=SHIMMER_PHI,
+    )
     return {
         "Ec": round(ec, 4),
         "Ns1": round(ns1, 4),
         "Ns2": round(ns2, 4),
         "Ns3": round(ns3, 4),
         "Classification": cls,
+        "shimmer_base": round(shimmer_base_val, 6),
     }
 
 
@@ -251,6 +265,7 @@ def notion_tick(
                 "edges_written": [],
                 "scores_updated": [],
                 "si_skipped": [],
+                "shimmer_base": {},
                 "errors": [],
                 "write_mode": "suppressed",
             }
@@ -264,6 +279,7 @@ def notion_tick(
         "edges_written": [],
         "scores_updated": [],
         "si_skipped": [],
+        "shimmer_base": {},
         "errors": [],
     }
 
@@ -315,6 +331,9 @@ def notion_tick(
             si=reg["Si"], et=reg["Et"], ss=reg["Ss"], idx=reg["Idx"],
             qe_adj=qe_adj,
         )
+
+        # Capture crystallisation seed diagnostic per shard.
+        results["shimmer_base"][name] = scores.get("shimmer_base", 0.0)
 
         score_patch = {
             "Qe": {"number": qe},
