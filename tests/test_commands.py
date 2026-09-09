@@ -60,8 +60,8 @@ class TestParse:
 
     def test_workflow_dev(self):
         p = parse_command("/dev")
-        assert p.kind == "workflow"
-        assert p.context_file == ".agent-context/dev.md"
+        assert p.kind == "mcp"
+        assert p.context_file is None
 
     def test_cairrn_bare_is_hub_state(self):
         p = parse_command("/cairrn")
@@ -157,7 +157,7 @@ class TestUmbrella:
     def test_read_bare_is_workflow(self):
         p = parse_command("/read")
         assert p.kind == "workflow"
-        assert p.context_file == ".agent-context/read.md"
+        assert p.context_file is None
         assert p.kwargs == {}
 
     def test_read_topic_is_workflow(self):

@@ -396,8 +396,8 @@ def check_run_command_dispatch(client: MCPClient) -> None:
     assert legacy.get("error") != "hook_violation", legacy
 
     wf = client.tool("run_command", {"command": "/dev"})
-    assert wf.get("kind") == "workflow", wf
-    assert wf.get("context_file") == ".agent-context/dev.md", wf
+    assert wf.get("kind") == "mcp", wf
+    assert wf.get("mode") == "dev", wf
 
     help_do = client.tool("run_command", {"command": "/do help"})
     assert help_do.get("kind") == "dispatcher", help_do
