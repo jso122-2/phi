@@ -135,13 +135,17 @@ def find_mode(query: str = "") -> dict:
     return result
 
 
-@mcp.tool()
 def agent_context(mode: str) -> dict:
     """
     Public dispatch entry-point for all workflow modes.
 
-    Called by run_command when the SPECS catalog routes /talk, /read, /dev,
-    /explain, /modular, /wire, /edit, /clean, /audit, /find to
-    agent_context(mode=<name>).
+    Called by command.py via getattr(mod, "agent_context") when run_command
+    routes /talk, /read, /dev, /explain, /modular, /wire, /edit, /clean,
+    /audit, /find to agent_context(mode=<name>).
+
+    Not decorated with @mcp.tool() — must remain a plain module attribute
+    so getattr(mcp_server.tools.context_modes, "agent_context") works.
+    The individual mode tools (talk, dev, explain, …) handle direct MCP
+    invocation.
     """
     return _agent_context(mode)
