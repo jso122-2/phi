@@ -19,11 +19,15 @@ from __future__ import annotations
 
 import os
 
-_CONSUMPTION_CAP: float = 2.0
-"""CODE shards 3+4 combined cap for the modular house (instantaneous)."""
+_CONSUMPTION_CAP: float = 8.0
+"""CODE shards 3+4 combined cap for the modular house (instantaneous).
+Calibrated to step-40 steady-state operating scale (shards typically 2.4–4.4
+each at full activation; combined ~5–9). Was 2.0 — too tight for a warm index."""
 
-_CODE_PRESSURE_CAP: float = 4.0
-"""Cumulative CODE delta cap from the session ledger for the modular house."""
+_CODE_PRESSURE_CAP: float = 12.0
+"""Cumulative CODE delta cap from the session ledger for the modular house.
+At step-40 scale the session-cumulative CODE delta runs ~5; 12.0 gives a full
+session of headroom before the safety gate fires. Was 4.0."""
 
 _CONFIDENCE_FLOOR: float = 0.2
 """Minimum CAIRRN coherence for the wire (PSSPPS) house."""

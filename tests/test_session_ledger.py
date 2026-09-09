@@ -195,23 +195,22 @@ class TestBMADLedgerIntegration:
             assert _predicate_modular() is True
 
     def test_modular_blocks_on_high_session_code_pressure(self):
-        ledger = self._fresh_ledger()
-        # Drive CODE shards (indices 3, 4) to 2.5 → code_pressure should exceed cap
-        # Simulate by patching code_pressure directly
+        # Use a pressure value well above the recalibrated _CODE_PRESSURE_CAP (12.0).
         ledger_mock = MagicMock()
-        ledger_mock.code_pressure.return_value = 5.0
+        ledger_mock.code_pressure.return_value = 13.0
         ledger_mock.is_open.return_value = True
         with patch("mcp_server._state._session_ledger", ledger_mock), \
              patch("mcp_server._state._adaptive_consumption", return_value=0.0), \
-             patch("mcp_server._admissions._ledger_code_pressure", return_value=5.0):
+             patch("mcp_server._admissions._ledger_code_pressure", return_value=13.0):
             from mcp_server._admissions import _CODE_PRESSURE_CAP, _predicate_modular
-            assert 5.0 >= _CODE_PRESSURE_CAP
+            assert 13.0 >= _CODE_PRESSURE_CAP, (
+                f"Mock value 13.0 must exceed cap {_CODE_PRESSURE_CAP}"
+            )
             assert _predicate_modular() is False
 
     def test_modular_blocks_on_instantaneous_overconsumption(self):
-        ledger = self._fresh_ledger()
-        with patch("mcp_server._state._session_ledger", ledger), \
-             patch("mcp_server._state._adaptive_consumption", return_value=3.0), \
+        # Use a consumption value above the recalibrated _CONSUMPTION_CAP (8.0).
+        with patch("mcp_server._state._adaptive_consumption", return_value=9.0), \
              patch("mcp_server._admissions._ledger_code_pressure", return_value=0.0):
             from mcp_server._admissions import _predicate_modular
             assert _predicate_modular() is False

@@ -602,19 +602,38 @@ def spawn_houses() -> DOMRequestQueue:
             "Build and validate — iterate with tests as the ground-truth signal",
         ),
         (
+            "inspect",
+            frozenset({
+                # Pure-read diagnostic tools — never gated on write pressure.
+                # These must always be callable so the system can self-diagnose
+                # even when the modular write house is admission-blocked.
+                "harmonic_index_state",
+                "hub_state",
+                "temporal_state",
+                "temporal_vector",
+                "temporal_coherence",
+                "cairrn_hub_state",
+                "cairrn_css_state",
+                "cairrn_m3_gate",
+                "cairrn_neuro_k",
+                "code_audit",
+                "forecast_state",
+                "shuffle_state",
+            }),
+            "Read-only diagnostics — inspect harmonic, temporal, CAIRRN, and code state",
+        ),
+        (
             "modular",
             frozenset({
-                "harmonic_index_state", "harmonic_propagate", "hub_state",
-                "temporal_state", "temporal_vector", "temporal_coherence",
-                "cairrn_hub_state", "cairrn_hub_run", "cairrn_batch_run",
-                "cairrn_css_state", "cairrn_m3_gate", "cairrn_neuro_k",
-                "code_audit",
+                # Write / propagation tools — admission-gated on CODE pressure.
+                "harmonic_propagate",
+                "cairrn_hub_run",
+                "cairrn_batch_run",
                 "rate_ten",
-                "forecast_state",
-                "shuffle_step", "shuffle_state",
+                "shuffle_step",
                 "phi_step",
             }),
-            "Propagate and read harmonic/temporal structure — shape both indices",
+            "Propagate and shape harmonic/temporal structure — write path only",
         ),
         (
             "wire",

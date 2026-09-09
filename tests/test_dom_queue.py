@@ -202,15 +202,30 @@ class TestSpawnHouses:
 
     def test_all_expected_houses_present(self):
         names = set(self.q._houses.keys())
-        for expected in ("talk", "dev", "modular", "wire", "edit", "clean", "graph"):
+        for expected in ("talk", "dev", "inspect", "modular", "wire", "edit", "clean", "graph"):
             assert expected in names, f"House {expected!r} missing from spawn_houses()"
 
-    def test_cairrn_tools_in_modular(self):
+    def test_cairrn_tools_in_inspect(self):
+        """Read-only CAIRRN/diagnostic tools live in the ungated inspect house."""
+        inspect = self.q._houses["inspect"]
+        assert inspect.admits("cairrn_hub_state")
+        assert inspect.admits("cairrn_neuro_k")
+        assert inspect.admits("code_audit")
+        assert inspect.admits("harmonic_index_state")
+        assert inspect.admits("cairrn_css_state")
+
+    def test_write_tools_in_modular(self):
+        """Write/propagation tools remain in the admission-gated modular house."""
         modular = self.q._houses["modular"]
-        assert modular.admits("cairrn_hub_state")
-        assert modular.admits("cairrn_neuro_k")
-        assert modular.admits("code_audit")
         assert modular.admits("rate_ten")
+        assert modular.admits("harmonic_propagate")
+        assert modular.admits("cairrn_hub_run")
+        assert modular.admits("cairrn_batch_run")
+
+    def test_inspect_house_has_no_admission_predicate(self):
+        """inspect house must never be admission-gated — reads must always run."""
+        inspect = self.q._houses["inspect"]
+        assert inspect._admission_check is None
 
     def test_command_dispatcher_in_clean(self):
         clean = self.q._houses["clean"]
