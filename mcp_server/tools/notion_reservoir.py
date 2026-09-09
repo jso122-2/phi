@@ -25,6 +25,8 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
+from workers.cairrn import f_crystallisation
+
 # ---------------------------------------------------------------------------
 # Shard registry — sourced from Notion workspace
 # ---------------------------------------------------------------------------
@@ -65,6 +67,10 @@ SHARD_REGISTRY: dict[str, dict[str, Any]] = {
 
 EDGES_DB_ID = "82ab8055-ca05-49ef-a4ae-b176641e78fe"
 SCORES_COLLECTION = "54c008d6-e791-4f26-ab48-11dfe7c8e796"
+
+# Per-shard Si memory for the f_crystallisation gate.
+# Keyed by shard_page_id → last Si value written to Notion.
+_r_node_prev: dict[str, float] = {}
 
 # CAIRRN hub → reservoir shard routing.
 # Keys are the live harmonic-index hub names (HOME / MATH / CODE / COMMANDS /
@@ -204,6 +210,7 @@ def notion_tick(
         "dry_run": dry_run,
         "edges_written": [],
         "scores_updated": [],
+        "si_skipped": [],
         "errors": [],
     }
 
@@ -279,7 +286,15 @@ def notion_tick(
             "patch": score_patch,
         })
 
-        if can_write:
+        # -- Si_delta gate (f_crystallisation) --
+        shard_page_id = reg["shard_page_id"]
+        r_node_prev = _r_node_prev.get(shard_page_id, 0.0)
+        current_si = float(reg["Si"])
+        si_delta = abs(current_si - r_node_prev)
+        thresh = f_crystallisation(eta=0.9, t_min=3, shimmerfield_t0=r_node_prev)
+        si_gate_open = si_delta > thresh
+
+        if can_write and si_gate_open:
             try:
                 _notion_request("POST", "pages", edge_payload, token_resolved)
             except Exception as e:
@@ -291,8 +306,15 @@ def notion_tick(
                     {"properties": score_patch},
                     token_resolved,
                 )
+                _r_node_prev[shard_page_id] = current_si
             except Exception as e:
                 results["errors"].append(f"score update {name}: {e}")
+        elif can_write and not si_gate_open:
+            results["si_skipped"].append({
+                "shard": name,
+                "si_delta": round(si_delta, 6),
+                "thresh": round(thresh, 6),
+            })
 
     results["write_mode"] = "live" if can_write else ("dry-run" if dry_run else "no-token")
     return results
