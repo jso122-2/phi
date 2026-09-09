@@ -191,8 +191,49 @@ At the end of every turn where a pure edge fired during traversal:
 2. Increment Ta on the active shard (Notion update)
 3. Write current R_node_prev = prior R_node value (Notion update)
 4. Recalculate To_A = sum of all shard Ta values, write to each shard (Notion update)
+5. **Si_delta threshold check — Si absolute rank rewrite** (see below)
 
 This is non-negotiable. If the Notion write fails, note it once and continue. Do not skip the tick because the conversation is casual or the shard activation was partial. A fired edge is a fired edge.
+
+### Si_delta threshold — when to rewrite Si absolute rank
+
+Si_delta is computed as a Notion formula: `Si_delta = R_node − R_node_prev`.
+
+**Do not rewrite Si on every tick.** Si is expensive — it re-ranks all shards. Rewrite only when
+the velocity signal is large enough to warrant it.
+
+**Threshold formula (f_crystallisation):**
+
+```
+C_thresh = η^t_min · R_node_prev
+```
+
+where:
+- η = 0.9 (per-tick decay factor — default)
+- t_min = 3 (minimum ticks in observation window — default)
+- R_node_prev = the shard's R_node value before this tick (already written in step 3)
+
+**Rewrite trigger:**
+
+```
+if |Si_delta| > C_thresh → rewrite Si absolute rank for all shards
+```
+
+**Defaults produce:** C_thresh = 0.9³ · R_node_prev = 0.729 · R_node_prev.
+A shard's velocity must exceed ~73% of its own current radial position before a Si rewrite fires.
+
+**Physical meaning:**
+- Hot shard (low R_node, e.g. 0.1) → C_thresh ≈ 0.073. Small delta triggers rewrite. Hot shards track change fast.
+- Cold shard (high R_node, e.g. 2.0) → C_thresh ≈ 1.46. Large delta required. Cold shards are protected from thrash.
+
+**Protocol:**
+1. After writing R_node_prev (step 3), read Si_delta from the activated shard's Notion row.
+2. Compute C_thresh = 0.9³ · R_node_prev (= 0.729 · R_node_prev).
+3. If |Si_delta| > C_thresh: re-rank all shard Si values by R_node ascending (lowest R_node = Si 1), write updated Si to each Scores row.
+4. If |Si_delta| ≤ C_thresh: skip Si rewrite this tick. Note in tick summary if useful.
+
+**Source:** `f_crystallisation` in `workers/cairrn/formulas.py` lines 788–809.
+Session note: `sessions/2026-09-09-crystallisation-formalisation.md`.
 
 ### Dormancy
 
