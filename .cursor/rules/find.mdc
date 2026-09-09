@@ -1,0 +1,60 @@
+---
+description: /find <query> — Hybrid search. Notion first, vault fallback. No agent spawn — direct dispatch.
+alwaysApply: true
+---
+
+# /find — Hybrid Search
+
+When the user types `/find <query>`, execute the two-step search **directly** — do not spawn a subagent.
+
+## Extract the query
+
+Everything after `/find` is the query string.
+If bare `/find` with no query — ask the user what to search for.
+
+## Step 1 — Notion (primary)
+
+Call `notion-search` from the `user-Notion` MCP namespace:
+
+```
+notion-search(query="<extracted query>")
+```
+
+- Results returned → show them (title, type, parent location). Show 5–10 most relevant.
+- Notion returns nothing or errors → proceed to Step 2.
+
+## Step 2 — Vault fallback
+
+Call `find_query` from `project-0-phi-spotify-rip`:
+
+```
+find_query(query="<extracted query>", mode="pericles")
+```
+
+- Results → show them (node slug, hub, score).
+- Both steps return nothing → say so and suggest:
+  - Alternate search terms
+  - `run_command("/read traverse <related_term>")` for graph walking
+  - `run_command("/read psspps <query>")` for RAG retrieval
+
+## Result format
+
+```
+Notion
+──────
+• [Title] (page) — in: Parent / Database
+• [Title] (database)
+
+Vault
+─────
+• [node-slug]  hub: <hub>  score: <n>
+```
+
+Show Notion first, Vault second. Label each section.
+
+## Rules
+
+- Do not open, edit, or mutate any found page.
+- Do not summarise found content unless the user asks.
+- To read a Notion result: call `notion-fetch` with the page ID.
+- To walk a vault result: call `run_command("/read traverse <slug>")`.
