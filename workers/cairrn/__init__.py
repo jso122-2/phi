@@ -146,6 +146,7 @@ from workers.cairrn.formulas import (
     f_secondary_model_select,
     f_scup_canonical,
     f_cc_energy_budget,
+    f_crystallisation,
 )
 
 # --- Z-space scoring ---------------------------------------------------------
@@ -238,6 +239,7 @@ __all__ = [
     "f_secondary_model_select",
     "f_scup_canonical",
     "f_cc_energy_budget",
+    "f_crystallisation",
     # z-space
     "ZScore",
     "compute_z_score",
