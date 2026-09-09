@@ -1,1 +1,0 @@
-{"job_id": "845b7e31dc8c4a5ea45b5b6bbe168506", "task": "warmup.phi", "kwargs": {}, "status": "done", "queued_at": 1787382989.720294, "started_at": 1787382989.772112, "result": {"warmed": "phi", "host": "mcp"}, "finished_at": 1787382989.772371}

@@ -1,47 +1,36 @@
-"""MCP / studio client: submit jobs onto the mmap ring, poll result files."""
+"""MCP / studio client: submit jobs to the singleton in-process scheduler."""
 from __future__ import annotations
 
-import json
 import os
-import time
-import uuid
-from pathlib import Path
 from typing import Any, Optional
 
-from mcp_server.bus.runtime import (
-    RING_CAPACITY,
-    RING_SLOT_SIZE,
-    complete_path,
-    dispatch_path,
-    jobs_dir,
-    pid_path,
-)
-from pipeline.bridge.mmap_pipe import SharedMmapPipe
-
-
-def _job_path(job_id: str) -> Path:
-    return jobs_dir() / f"{job_id}.json"
+from mcp_server.bus.runtime import pid_path
 
 
 def load_job(job_id: str) -> Optional[dict[str, Any]]:
-    path = _job_path(job_id)
-    if not path.exists():
+    from mcp_server.bus.scheduler import get_scheduler
+
+    sched = get_scheduler()
+    if sched is None:
         return None
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
+    return sched.load(job_id)
 
 
 def save_job(record: dict[str, Any]) -> None:
-    jobs_dir().mkdir(parents=True, exist_ok=True)
-    path = _job_path(str(record["job_id"]))
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(record, default=str), encoding="utf-8")
-    tmp.replace(path)
+    from mcp_server.bus.scheduler import get_scheduler
+
+    sched = get_scheduler()
+    if sched is None:
+        return
+    sched.save(record)
 
 
 def worker_pid() -> Optional[int]:
+    from mcp_server.bus.scheduler import get_scheduler
+
+    sched = get_scheduler()
+    if sched is not None and sched.alive:
+        return os.getpid()
     path = pid_path()
     if not path.exists():
         return None
@@ -52,111 +41,72 @@ def worker_pid() -> Optional[int]:
 
 
 def worker_alive(pid: Optional[int] = None) -> bool:
-    pid = pid if pid is not None else worker_pid()
-    if pid is None:
-        return False
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return False
-    return True
+    if pid is not None:
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        return True
+    from mcp_server.bus.scheduler import get_scheduler
+
+    sched = get_scheduler()
+    return sched is not None and sched.alive
 
 
 class BusClient:
-    """Thin mmap client. Does not import celery or run tasks."""
+    """Thin facade over the process-lifetime BusScheduler."""
 
-    def __init__(
-        self,
-        dispatch: SharedMmapPipe,
-        complete: SharedMmapPipe,
-    ) -> None:
-        self._dispatch = dispatch
-        self._complete = complete
+    def __init__(self, scheduler: Any = None) -> None:
+        self._sched = scheduler
+
+    @property
+    def alive(self) -> bool:
+        sched = self._sched
+        return sched is not None and bool(getattr(sched, "alive", False))
 
     @classmethod
     def connect(cls, *, create: bool = False) -> Optional["BusClient"]:
-        dpath = dispatch_path()
-        cpath = complete_path()
-        if not dpath.exists() or not cpath.exists():
-            if not create:
-                return None
-        try:
-            dispatch = SharedMmapPipe(
-                dpath, capacity=RING_CAPACITY, slot_size=RING_SLOT_SIZE, create=create,
-            )
-            complete = SharedMmapPipe(
-                cpath, capacity=RING_CAPACITY, slot_size=RING_SLOT_SIZE, create=create,
-            )
-        except FileNotFoundError:
+        from mcp_server.bus.scheduler import ensure_scheduler, get_scheduler
+
+        if create:
+            return cls(ensure_scheduler())
+        sched = get_scheduler()
+        if sched is None or not sched.alive:
             return None
-        return cls(dispatch, complete)
+        return cls(sched)
 
     def close(self) -> None:
-        try:
-            self._dispatch.close()
-        except Exception:
-            pass
-        try:
-            self._complete.close()
-        except Exception:
-            pass
+        return None
 
     def submit(self, task: str, kwargs: Optional[dict[str, Any]] = None) -> dict[str, Any]:
-        job_id = uuid.uuid4().hex
-        record: dict[str, Any] = {
-            "job_id": job_id,
-            "task": task,
-            "kwargs": kwargs or {},
-            "status": "queued",
-            "queued_at": time.time(),
-        }
-        save_job(record)
-        msg = json.dumps({"job_id": job_id, "task": task}).encode()
-        ok = self._dispatch.put(msg, timeout=5.0)
-        if not ok:
-            record["status"] = "error"
-            record["error"] = "dispatch_ring_full"
-            save_job(record)
-        return {
-            "job_id": job_id,
-            "task": task,
-            "status": record["status"],
-            "worker_alive": worker_alive(),
-        }
+        if self._sched is None:
+            return {
+                "job_id": "",
+                "task": task,
+                "status": "error",
+                "error": "bus_unavailable",
+                "worker_alive": False,
+            }
+        return self._sched.submit(task, kwargs)
 
     def poll(self, job_id: str) -> Optional[dict[str, Any]]:
-        # Drain complete-ring ticks so the worker never blocks on a full complete pipe.
-        while True:
-            tick = self._complete.get(timeout=0.0)
-            if tick is None:
-                break
-        return load_job(job_id)
+        if self._sched is None:
+            return None
+        return self._sched.poll(job_id)
 
     def wait(self, job_id: str, timeout: float = 30.0) -> Optional[dict[str, Any]]:
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            rec = self.poll(job_id)
-            if rec is not None and rec.get("status") in {"done", "error"}:
-                return rec
-            remaining = deadline - time.monotonic()
-            self._complete.get(timeout=min(0.25, max(0.0, remaining)))
-        return self.poll(job_id)
+        if self._sched is None:
+            return None
+        return self._sched.wait(job_id, timeout=timeout)
 
     def status(self) -> dict[str, Any]:
-        pid = worker_pid()
-        n_jobs = 0
-        try:
-            n_jobs = len(list(jobs_dir().glob("*.json")))
-        except OSError:
-            pass
-        return {
-            "worker_alive": worker_alive(pid),
-            "worker_pid": pid,
-            "runtime": str(dispatch_path().parent),
-            "dispatch_qsize": self._dispatch.qsize(),
-            "complete_qsize": self._complete.qsize(),
-            "n_job_files": n_jobs,
-        }
+        if self._sched is None:
+            return {
+                "worker_alive": False,
+                "worker_pid": None,
+                "connected": False,
+            }
+        return self._sched.snapshot()
 
 
 _client: Optional[BusClient] = None
@@ -164,9 +114,11 @@ _client: Optional[BusClient] = None
 
 def get_client() -> Optional[BusClient]:
     global _client
-    if _client is not None:
+    if _client is not None and _client.alive:
         return _client
-    _client = BusClient.connect(create=False)
+    from mcp_server.bus.scheduler import ensure_scheduler
+
+    _client = BusClient(ensure_scheduler())
     return _client
 
 
@@ -190,7 +142,7 @@ def submit_and_maybe_wait(
         return {
             "error": "bus_unavailable",
             "task": task,
-            "hint": "celery worker did not open the mmap rings",
+            "hint": "bus scheduler did not start",
         }
     ticket = client.submit(task, kwargs)
     if wait_s <= 0:

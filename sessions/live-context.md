@@ -1,4 +1,4 @@
-# Live Context — 2026-08-22 23:19 UTC
+# Live Context — 2026-09-09 02:55 UTC
 
 #live-context #session
 
@@ -7,29 +7,29 @@
 ---
 
 ## 1. [[PLAYBACK]]
-*path:* `music/PLAYBACK.md` · *score:* 0.477
+*path:* `music/PLAYBACK.md` · *score:* 0.530
 
 --- hub: PLAYBACK shard: 0 basin: 1.96 tags: [hub, music, playback] --- PLAYBACK hub Hub shard 0 — live track state and queue context. Activated on every track load ( ). The strongest and most immediate signal in the rin
 
-## 2. [[COMMANDS]]
-*path:* `COMMANDS.md` · *score:* 0.255
+## 2. [[edit]]
+*path:* `.ai_agent_context/edit.md` · *score:* 0.356
 
-COMMANDS — Executable Command Hub hub command Every command here is agent-executable via the MCP server. Agents read and call the MCP tools directly. --- Connections HOME grand central mcp-server — the tools being called
+--- name: edit description: - Surgical inline fixes. Spawns a fresh agent that fixes one specific bug with the smallest possible change. No refactoring. No scope expansion. --- /edit — Surgical Fix Immediately spawn a fr
 
-## 3. [[cairrn]]
-*path:* `cairrn.md` · *score:* 0.251
+## 3. [[clean]]
+*path:* `.ai_agent_context/clean.md` · *score:* 0.356
 
-cairrn — CAIRRN Worker System hub math command Coherent Attractor-Indexed Recursive Routing Network. Every metric that enters this system passes through three layers before it touches the harmonic index. --- The Rider Th
+--- name: clean description: - File tree cleanup. Spawns a fresh agent that moves, deletes, normalises, and gitignores. No logic changes — file operations only. --- /clean — File Tree Cleanup Immediately spawn a fresh ge
 
-## 4. [[MOOD]]
-*path:* `music/MOOD.md` · *score:* 0.227
+## 4. [[SKILL]]
+*path:* `reservoir/skills/autonomous-index/SKILL.md` · *score:* 0.335
 
---- hub: MOOD shard: 2 basin: 5.88 tags: [hub, music, mood] --- MOOD hub Hub shard 2 — emotional arc, valence, and danceability. Receives injections from: - ([0, 1] — musical positiveness) - ([0, 1] — rhythm regularity, 
+--- name: autonomous-index description: Claude operating protocol for running the Reservoir inference graph as a live autonomous index against Notion. Read at session start via /init and executed throughout. Governs shar
 
-## 5. [[temporal-index]]
-*path:* `temporal-index.md` · *score:* 0.205
+## 5. [[audit]]
+*path:* `.ai_agent_context/audit.md` · *score:* 0.327
 
-temporal-index math code hub The temporal sharding index — the TIME dimension of the CAIRRN graph. CAIRRN-aware. Ana-Chi hosted. --- The two dimensions of the index Together they give a 2D activation landscape: --- Archi
+--- name: audit description: - Three-layer health audit. Spawns a fresh agent that inspects environment, vault graph, and codebase — then produces a prioritised action list. --- /audit — Three-Layer Health Audit Immediat
 
 ---
 
@@ -51,4 +51,6 @@ temporal-index math code hub The temporal sharding index — the TIME dimension 
 
 ---
 
-*Phase 2 complete — source=direct, α=0.61, 5 docs, 0 comment node(s).*
+*Harmonic grounding: {'HOME': 5}*
+
+*Phase 2 complete — source=bus, α=0.61, 5 docs, 0 comment node(s).*

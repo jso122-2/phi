@@ -127,11 +127,20 @@ class TestCatalog:
         for slash in (*READ_SUBS.values(), *DO_SUBS.values()):
             assert slash in CATALOG, slash
 
+    def test_umbrella_covers_every_mcp_slash(self):
+        from mcp_server.commands import SPECS, _UMBRELLA_EXEMPT
+
+        covered = set(READ_SUBS.values()) | set(DO_SUBS.values()) | set(_UMBRELLA_EXEMPT)
+        missing = [s.slash for s in SPECS if s.kind == "mcp" and s.slash not in covered]
+        assert missing == []
+
     def test_alias_map_roundtrip(self):
         aliases = alias_map()
         assert aliases["/index"] == "/read index"
         assert aliases["/sim"] == "/do sim"
         assert aliases["/graph-commit"] == "/do commit"
+        assert aliases["/vault-store"] == "/read vault-store"
+        assert aliases["/vault-project"] == "/do vault-project"
 
     def test_tool_alias_roundtrip(self):
         assert slash_for_tool("double_well_sim") == "/sim"

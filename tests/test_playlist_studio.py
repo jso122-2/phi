@@ -384,20 +384,63 @@ class TestCairrnIntegration:
         floor.studio_build.assert_called_once_with(5)
 
 
-class TestStudioPlugins:
-    def test_plugin_table_has_playlist_build(self):
-        from phi.engine.studio_plugins import PLUGIN_TASKS
-        assert PLUGIN_TASKS["playlist_build"] == "studio.build"
+class TestStudioBus:
+    """phi.engine.studio singleton bus accessor."""
 
-    def test_plugin_falls_back_in_process_when_bus_down(self):
-        from phi.engine.studio_plugins import run_plugin
-        lib = _make_annotated_library(12)
-        result = run_plugin(
-            "playlist_build",
-            {"seeds": [lib.playlist[0]], "target_count": 4, "arc_shape": "flat"},
-            library=lib,
-            floor=None,
-            wait_s=0.1,
+    def test_build_raises_when_bus_down(self):
+        """studio.build() raises RuntimeError when the bus worker is not alive."""
+        from phi.engine.studio import build
+        from phi.engine.playlist_studio import StudioRequest
+        import unittest.mock as mock
+
+        lib = _make_annotated_library(8)
+        req = StudioRequest(seeds=[lib.playlist[0]], target_count=4)
+
+        with mock.patch("mcp_server.bus.client.worker_alive", return_value=False), \
+             mock.patch("mcp_server.bus.client.get_client", return_value=None):
+            with pytest.raises(RuntimeError, match="bus scheduler not running"):
+                build(req)
+
+    def test_build_submits_correct_task(self):
+        """studio.build() submits 'studio.build' task with the right payload keys."""
+        from phi.engine.studio import build
+        from phi.engine.playlist_studio import StudioRequest, StudioResult
+        import unittest.mock as mock
+
+        lib = _make_annotated_library(8)
+        req = StudioRequest(
+            seeds=[lib.playlist[0]],
+            target_count=4,
         )
-        assert len(result.tracks) >= 1
-        assert result.tracks[0] == lib.playlist[0]
+
+        fake_result = {
+            "tracks": [lib.playlist[0], lib.playlist[1]],
+            "arc_targets": [0.5, 0.5],
+            "arc_scores": [0.9, 0.8],
+            "transition_scores": [0.7],
+            "seed_paths": [lib.playlist[0]],
+            "arc_shape": "flat",
+            "n_annotated": 2,
+            "n_fallback": 0,
+        }
+        fake_rec = {"status": "done", "result": fake_result}
+
+        mock_client = mock.MagicMock()
+        mock_client.submit.return_value = {"job_id": "test-job-id"}
+        mock_client.wait.return_value = fake_rec
+
+        with mock.patch("mcp_server.bus.client.worker_alive", return_value=True), \
+             mock.patch("mcp_server.bus.client.get_client", return_value=mock_client):
+            result = build(req)
+
+        submitted_task = mock_client.submit.call_args[0][0]
+        submitted_payload = mock_client.submit.call_args[0][1]
+
+        assert submitted_task == "studio.build"
+        assert "seeds" in submitted_payload
+        assert "arc_shape" in submitted_payload
+        assert submitted_payload["seeds"] == req.seeds
+
+        assert isinstance(result, StudioResult)
+        assert result.tracks == fake_result["tracks"]
+        assert result.n_annotated == 2

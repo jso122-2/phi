@@ -51,7 +51,7 @@ This mode does NOT spawn a subagent. It dispatches directly to MCP tools.
 | `track` | Usage ledger + git-hot notes |
 | `traverse <seed>` | Walk vault from a seed node |
 | `vault` | Live vault-hub snapshot |
-| `vault-store` | Vault store statistics |
+| `vault-store` | SQL vault store — nodes by layer, edges, usage events |
 
 ### Search & retrieval
 | Sub | Returns |
@@ -79,8 +79,3 @@ This mode does NOT spawn a subagent. It dispatches directly to MCP tools.
 |---|---|
 | `phi` | Phi dispatcher queue + gate state |
 | `shuffle` | Prefeed shuffle + gate state |
-
-### Notion
-| Sub | Returns |
-|---|---|
-| `notion-state` | Notion Reservoir shard registry + token status |

@@ -149,6 +149,36 @@ except Exception as _exc:
 _retrigger_count: int = 0
 
 # ---------------------------------------------------------------------------
+# Notion Reservoir traversal cache
+# ---------------------------------------------------------------------------
+
+_notion_traversal_cache: dict[str, list[dict]] = {}
+"""
+Process-lifetime cache of the most recent notion.traverse results.
+
+Maps shard_name → list of adjacent-shard dicts returned by notion_traverse().
+Updated by the notion.traverse bus task after each traversal.  Read by
+side_effects._apply() to pulse adjacent hubs into the harmonic ring.
+
+Format per entry::
+
+    {
+        "shard":          "recursive-thought",
+        "via_edge":       "schema <-> dawn :: architecture-as-prose",
+        "weight":         "medium",
+        "axis":           "semantic",
+        "axis_match":     0,
+        "d":              2.0,
+        "f_edge":         0.0,
+        "note":           "...",
+        "hub":            "MATH",
+        "classification": "access-outlier",
+        "ns1":            4.0,
+        "ns2":            -2.385,
+    }
+"""
+
+# ---------------------------------------------------------------------------
 # Adaptive CAIRRN state
 # ---------------------------------------------------------------------------
 

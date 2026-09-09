@@ -47,7 +47,7 @@ from PySide6.QtWidgets import (
 from phi.config import ACC, ACC2, BG, CARD, CARD2, FG, MUTED, fmt_time
 from phi.engine.arc_engine import ArcShape
 from phi.engine.playlist_studio import StudioRequest
-from phi.engine.studio_plugins import run_plugin
+from phi.engine.studio import build as _studio_build
 
 if TYPE_CHECKING:
     from phi.engine.playlist_studio import StudioResult
@@ -317,21 +317,7 @@ class MLStudioPage(QWidget):
 
         def _worker() -> None:
             try:
-                lib   = self._ctrl.library  # type: ignore[union-attr]
-                floor = getattr(self._ctrl, "_floor", None)
-                result = run_plugin(
-                    "playlist_build",
-                    {
-                        "seeds": list(request.seeds),
-                        "arc_shape": request.arc_shape.value,
-                        "target_count": request.target_count,
-                        "max_per_artist": request.max_per_artist,
-                        "max_per_genre": request.max_per_genre,
-                    },
-                    library=lib,
-                    floor=floor,
-                )
-                # Deliver on main thread
+                result = _studio_build(request)
                 sched = getattr(self._ctrl, "_sched", None)
                 if sched:
                     sched(0, lambda: self._on_build_done(result))

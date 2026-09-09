@@ -374,3 +374,113 @@ worker: Warm shutdown (MainProcess)
 [bus-worker] WARNING kombu.connection: No hostname was supplied. Reverting to default 'localhost'
 [bus-worker] INFO celery.worker.consumer.connection: Connected to filesystem://localhost//
 [bus-worker] INFO celery.apps.worker: spotify-rip-bus@Jacks-MacBook-Neo.local ready.
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/jack0/Documents/phi/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/jack0/Documents/phi/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/jack0/Documents/phi/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/jack0/Documents/phi/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/jack0/Documents/phi/.runtime/bus/dispatch.ring
+[mcp_server._state] harmonic snapshot restored (step=1, total=1.0000)
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/jack0/Documents/phi/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/jack0/Documents/phi/.runtime/bus/dispatch.ring
+[mcp_server._state] harmonic snapshot restored (step=1, total=1.0000)
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/jack0/Documents/phi/.runtime/bus/dispatch.ring
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/jack0/Documents/phi/.runtime/bus/dispatch.ring
+[bus-worker] ERROR mcp_server.bus.consumer: task search.psspps failed
+Traceback (most recent call last):
+  File "/Users/jack0/Documents/phi/mcp_server/bus/consumer.py", line 73, in consume_forever
+    result = run_task(str(task), rec.get("kwargs") or {}, job_id=str(job_id))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jack0/Documents/phi/mcp_server/bus/_task_registry.py", line 52, in run_task
+    return json_safe(fn(**kw))
+                     ^^^^^^^^
+TypeError: search_psspps() missing 2 required positional arguments: 'query' and 'activations'
+[bus-worker] ERROR mcp_server.bus.consumer: task search.psspps failed
+Traceback (most recent call last):
+  File "/Users/jack0/Documents/phi/mcp_server/bus/consumer.py", line 73, in consume_forever
+    result = run_task(str(task), rec.get("kwargs") or {}, job_id=str(job_id))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jack0/Documents/phi/mcp_server/bus/_task_registry.py", line 52, in run_task
+    return json_safe(fn(**kw))
+                     ^^^^^^^^
+TypeError: search_psspps() missing 2 required positional arguments: 'query' and 'activations'
+[bus-worker] ERROR mcp_server.bus.consumer: task search.psspps failed
+Traceback (most recent call last):
+  File "/Users/jack0/Documents/phi/mcp_server/bus/consumer.py", line 73, in consume_forever
+    result = run_task(str(task), rec.get("kwargs") or {}, job_id=str(job_id))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jack0/Documents/phi/mcp_server/bus/_task_registry.py", line 52, in run_task
+    return json_safe(fn(**kw))
+                     ^^^^^^^^
+TypeError: search_psspps() missing 2 required positional arguments: 'query' and 'activations'
+[bus-worker] ERROR mcp_server.bus.consumer: task search.psspps failed
+Traceback (most recent call last):
+  File "/Users/jack0/Documents/phi/mcp_server/bus/consumer.py", line 73, in consume_forever
+    result = run_task(str(task), rec.get("kwargs") or {}, job_id=str(job_id))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jack0/Documents/phi/mcp_server/bus/_task_registry.py", line 52, in run_task
+    return json_safe(fn(**kw))
+                     ^^^^^^^^
+TypeError: search_psspps() missing 2 required positional arguments: 'query' and 'activations'
+[bus-worker] ERROR mcp_server.bus.consumer: task search.psspps failed
+Traceback (most recent call last):
+  File "/Users/jack0/Documents/phi/mcp_server/bus/consumer.py", line 73, in consume_forever
+    result = run_task(str(task), rec.get("kwargs") or {}, job_id=str(job_id))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jack0/Documents/phi/mcp_server/bus/_task_registry.py", line 52, in run_task
+    return json_safe(fn(**kw))
+                     ^^^^^^^^
+TypeError: search_psspps() missing 2 required positional arguments: 'query' and 'activations'
+[bus-worker] ERROR mcp_server.bus.consumer: task search.psspps failed
+Traceback (most recent call last):
+  File "/Users/jack0/Documents/phi/mcp_server/bus/consumer.py", line 73, in consume_forever
+    result = run_task(str(task), rec.get("kwargs") or {}, job_id=str(job_id))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jack0/Documents/phi/mcp_server/bus/_task_registry.py", line 52, in run_task
+    return json_safe(fn(**kw))
+                     ^^^^^^^^
+TypeError: search_psspps() missing 2 required positional arguments: 'query' and 'activations'
+[bus-worker] ERROR mcp_server.bus.consumer: task search.psspps failed
+Traceback (most recent call last):
+  File "/Users/jack0/Documents/phi/mcp_server/bus/consumer.py", line 73, in consume_forever
+    result = run_task(str(task), rec.get("kwargs") or {}, job_id=str(job_id))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jack0/Documents/phi/mcp_server/bus/_task_registry.py", line 52, in run_task
+    return json_safe(fn(**kw))
+                     ^^^^^^^^
+TypeError: search_psspps() missing 2 required positional arguments: 'query' and 'activations'
+[bus-worker] ERROR mcp_server.bus.consumer: task search.psspps failed
+Traceback (most recent call last):
+  File "/Users/jack0/Documents/phi/mcp_server/bus/consumer.py", line 73, in consume_forever
+    result = run_task(str(task), rec.get("kwargs") or {}, job_id=str(job_id))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jack0/Documents/phi/mcp_server/bus/_task_registry.py", line 52, in run_task
+    return json_safe(fn(**kw))
+                     ^^^^^^^^
+TypeError: search_psspps() missing 2 required positional arguments: 'query' and 'activations'
+[mcp_server._state] harmonic snapshot restored (step=1, total=1.0000)
+[bus-worker] ERROR mcp_server.bus.consumer: task notion.tick failed
+Traceback (most recent call last):
+  File "/Users/jack0/Documents/phi/mcp_server/bus/consumer.py", line 73, in consume_forever
+    result = run_task(str(task), rec.get("kwargs") or {}, job_id=str(job_id))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jack0/Documents/phi/mcp_server/bus/_task_registry.py", line 52, in run_task
+    return json_safe(fn(**kw))
+                     ^^^^^^^^
+TypeError: notion_tick_task() got an unexpected keyword argument 'register'
+[bus-worker] ERROR mcp_server.bus.consumer: task notion.tick failed
+Traceback (most recent call last):
+  File "/Users/jack0/Documents/phi/mcp_server/bus/consumer.py", line 73, in consume_forever
+    result = run_task(str(task), rec.get("kwargs") or {}, job_id=str(job_id))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jack0/Documents/phi/mcp_server/bus/_task_registry.py", line 52, in run_task
+    return json_safe(fn(**kw))
+                     ^^^^^^^^
+  File "/Users/jack0/Documents/phi/mcp_server/bus/tasks_notion.py", line 108, in notion_tick_task
+    target_shards = {s.strip() for s in shards.split(",") if s.strip()}
+                                        ^^^^^^^^^^^^
+AttributeError: 'list' object has no attribute 'split'
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/jack0/Documents/phi/.runtime/bus/dispatch.ring
+[mcp_server._state] harmonic snapshot restored (step=1, total=1.0000)
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/jack0/Documents/phi/.runtime/bus/dispatch.ring
+[mcp_server._state] harmonic snapshot restored (step=1, total=1.0000)
+[bus-worker] INFO mcp_server.bus.consumer: mmap consumer attached to /Users/jack0/Documents/phi/.runtime/bus/dispatch.ring

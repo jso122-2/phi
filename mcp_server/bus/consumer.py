@@ -1,4 +1,8 @@
-"""Mmap consume loop — runs inside the celery worker process."""
+"""Legacy mmap consume loop.
+
+Superseded by ``mcp_server.bus.scheduler.BusScheduler``. Kept so old
+``python -m mcp_server.bus`` workers drain cleanly if one is still running.
+"""
 from __future__ import annotations
 
 import json

@@ -63,7 +63,7 @@ SHARD_REGISTRY: dict[str, dict[str, Any]] = {
     },
 }
 
-EDGES_DB_ID = "82ab8055-ca05-49ef-a4ae-b176641e78fe"
+EDGES_DB_ID = "1c53019e-6d7d-44b9-9bb7-540bad2ce732"
 SCORES_COLLECTION = "54c008d6-e791-4f26-ab48-11dfe7c8e796"
 
 # CAIRRN hub → reservoir shard routing.
@@ -84,10 +84,42 @@ CAIRRN_HUB_TO_SHARD: dict[str, str] = {
     "agent-context": "schema-fragments",
 }
 
+# Inverse: shard name → CAIRRN hub name (for hub pulsing after traversal).
+SHARD_TO_CAIRRN_HUB: dict[str, str] = {v: k for k, v in CAIRRN_HUB_TO_SHARD.items()}
+
+# Prompt register → Edges DB Axis value.
+REGISTER_TO_AXIS: dict[str, str] = {
+    "architectural": "structural",
+    "charged":       "valence",
+    "recursive":     "recursive",
+    "narrative":     "semantic",
+    # pass-through aliases so callers can use axis names directly
+    "semantic":      "semantic",
+    "structural":    "structural",
+    "valence":       "valence",
+    "biographical":  "biographical",
+}
+
+# Weight → numeric priority for sorting.
+_WEIGHT_SCORE: dict[str, int] = {"high": 3, "medium": 2, "low": 1}
+
 
 def hub_to_shard(hub_name: str) -> str | None:
     """Translate a CAIRRN hub name to its reservoir shard name, or None if unmapped."""
     return CAIRRN_HUB_TO_SHARD.get(hub_name)
+
+
+def _to_dashed_uuid(hex_id: str) -> str:
+    """Convert a 32-char hex shard_page_id to dashed-UUID form (Notion API format)."""
+    h = hex_id.replace("-", "")
+    return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}"
+
+
+# Reverse lookup: dashed UUID (from Notion API relation responses) → shard name.
+_PAGE_ID_TO_SHARD: dict[str, str] = {
+    _to_dashed_uuid(reg["shard_page_id"]): name
+    for name, reg in SHARD_REGISTRY.items()
+}
 
 
 # ---------------------------------------------------------------------------
@@ -156,26 +188,202 @@ def _notion_request(
         return json.loads(resp.read())
 
 
-def _fetch_current_scores(page_id: str, token: str) -> dict[str, float]:
+def _fetch_current_scores(page_id: str, token: str) -> dict[str, Any]:
     """
-    Fetch the current numeric score properties from a Notion Scores page.
+    Fetch numeric score properties AND the Classification select from a Notion
+    Scores page.
 
-    Returns a dict with float values for any numeric property that exists on
-    the page (e.g. ``{"Qe": 5.0, "Ta": 3.0, ...}``).  Returns an empty dict
-    on any network / auth error so callers can safely fall back to 0.
+    Returns a dict with ``float`` values for numeric properties and ``str``
+    values for select properties (e.g. ``{"Qe": 5.0, "Classification":
+    "load-bearing", ...}``).  Returns an empty dict on any error so callers
+    can safely fall back to defaults.
     """
     try:
         resp = _notion_request("GET", f"pages/{page_id}", token=token)
         props = resp.get("properties", {})
-        result: dict[str, float] = {}
+        result: dict[str, Any] = {}
         for key, val in props.items():
-            if isinstance(val, dict) and val.get("type") == "number":
+            if not isinstance(val, dict):
+                continue
+            if val.get("type") == "number":
                 num = val.get("number")
                 if isinstance(num, (int, float)):
                     result[key] = float(num)
+            elif val.get("type") == "select":
+                sel = val.get("select") or {}
+                name = sel.get("name")
+                if name:
+                    result[key] = name
         return result
     except Exception:
         return {}
+
+
+def _query_database(db_id: str, body: dict, token: str) -> dict:
+    """POST /databases/{db_id}/query — return the raw Notion API response."""
+    return _notion_request("POST", f"databases/{db_id}/query", body, token)
+
+
+# ---------------------------------------------------------------------------
+# Traversal — hyphae layer (Step 3 of the autonomous-index protocol)
+# ---------------------------------------------------------------------------
+
+def notion_traverse(
+    shard: str,
+    register: str = "",
+    top_n: int = 2,
+    token: str | None = None,
+) -> dict[str, Any]:
+    """
+    Traverse adjacent edges from *shard* in the Notion Edges DB.
+
+    Implements Step 3 of the Autonomous Index protocol:
+    - Queries Edges DB for Type=adjacent rows where Shard A or Shard B
+      contains the activated shard's page ID.
+    - Scores each edge: F_edge = Ns1_A × Ns1_B / max(d², 0.01), then
+      sorts by (axis_match DESC, F_edge DESC, weight_score DESC, d ASC).
+    - Returns top_n unique connected shards with their current Classifications
+      fetched from the Scores DB.
+
+    Parameters
+    ----------
+    shard    : shard name from SHARD_REGISTRY
+    register : prompt register (architectural / charged / recursive / narrative)
+               used to prefer axis-matching edges
+    top_n    : maximum adjacent shards to return (default 2)
+    token    : Notion integration token; falls back to NOTION_TOKEN env var
+    """
+    reg = SHARD_REGISTRY.get(shard)
+    if reg is None:
+        return {"shard": shard, "error": f"unknown shard: {shard}", "adjacent": []}
+
+    token_resolved = token or os.environ.get("NOTION_TOKEN", "")
+    if not token_resolved:
+        return {"shard": shard, "error": "NOTION_TOKEN not set", "adjacent": []}
+
+    shard_uuid = _to_dashed_uuid(reg["shard_page_id"])
+    preferred_axis = REGISTER_TO_AXIS.get(register, "")
+
+    # --- query Edges DB --------------------------------------------------
+    try:
+        resp = _query_database(
+            EDGES_DB_ID,
+            {
+                "filter": {
+                    "and": [
+                        {"property": "Type", "select": {"equals": "adjacent"}},
+                        {
+                            "or": [
+                                {"property": "Shard A", "relation": {"contains": shard_uuid}},
+                                {"property": "Shard B", "relation": {"contains": shard_uuid}},
+                            ]
+                        },
+                    ]
+                },
+                "page_size": 30,
+            },
+            token_resolved,
+        )
+    except Exception as exc:
+        return {"shard": shard, "error": str(exc), "adjacent": []}
+
+    results = resp.get("results", [])
+
+    # --- parse and score each edge ----------------------------------------
+    edges: list[dict[str, Any]] = []
+    for page in results:
+        props = page.get("properties", {})
+
+        weight = (props.get("Weight", {}).get("select") or {}).get("name", "low")
+        axis   = (props.get("Axis",   {}).get("select") or {}).get("name", "")
+
+        d_raw = props.get("d", {}).get("number")
+        d = float(d_raw) if d_raw is not None else 2.0
+        d = max(d, 0.01)
+
+        ns1_a = float(props.get("Ns1_A", {}).get("number") or 0.0)
+        ns1_b = float(props.get("Ns1_B", {}).get("number") or 0.0)
+        f_edge = ns1_a * ns1_b / (d ** 2)
+
+        title_parts = props.get("Label", {}).get("title") or []
+        label = "".join(p.get("plain_text", "") for p in title_parts)
+
+        note_parts = props.get("Note", {}).get("rich_text") or []
+        note = "".join(p.get("plain_text", "") for p in note_parts)[:200]
+
+        # Identify connected shards (opposite side, excluding input shard)
+        shard_a_rel = props.get("Shard A", {}).get("relation") or []
+        shard_b_rel = props.get("Shard B", {}).get("relation") or []
+        connected: list[str] = []
+        for rel_entry in shard_a_rel + shard_b_rel:
+            pid = rel_entry.get("id", "")
+            if pid == shard_uuid:
+                continue
+            name = _PAGE_ID_TO_SHARD.get(pid)
+            if name and name not in connected:
+                connected.append(name)
+
+        if not connected:
+            continue
+
+        axis_match = 1 if (preferred_axis and axis == preferred_axis) else 0
+        edges.append({
+            "label":        label,
+            "weight":       weight,
+            "weight_score": _WEIGHT_SCORE.get(weight, 1),
+            "axis":         axis,
+            "axis_match":   axis_match,
+            "d":            d,
+            "f_edge":       round(f_edge, 6),
+            "note":         note,
+            "connected":    connected,
+        })
+
+    # Sort: axis_match desc, f_edge desc, weight_score desc, d asc
+    edges.sort(key=lambda e: (-e["axis_match"], -e["f_edge"], -e["weight_score"], e["d"]))
+
+    # Collect top_n unique connected shards in priority order
+    seen: set[str] = set()
+    top_shards: list[dict[str, Any]] = []
+    for edge in edges:
+        for adj_name in edge["connected"]:
+            if adj_name in seen:
+                continue
+            seen.add(adj_name)
+            entry: dict[str, Any] = {
+                "shard":       adj_name,
+                "via_edge":    edge["label"],
+                "weight":      edge["weight"],
+                "axis":        edge["axis"],
+                "axis_match":  edge["axis_match"],
+                "d":           edge["d"],
+                "f_edge":      edge["f_edge"],
+                "note":        edge["note"],
+                "hub":         SHARD_TO_CAIRRN_HUB.get(adj_name, ""),
+                # Classification fetched below
+                "classification": "unknown",
+                "ns1": 0.0,
+                "ns2": 0.0,
+            }
+            adj_reg = SHARD_REGISTRY.get(adj_name)
+            if adj_reg:
+                scores = _fetch_current_scores(adj_reg["score_page_id"], token_resolved)
+                entry["classification"] = scores.get("Classification", "unknown")
+                entry["ns1"] = float(scores.get("Ns1", 0.0))
+                entry["ns2"] = float(scores.get("Ns2", 0.0))
+            top_shards.append(entry)
+            if len(top_shards) >= top_n:
+                break
+        if len(top_shards) >= top_n:
+            break
+
+    return {
+        "shard":          shard,
+        "register":       register,
+        "preferred_axis": preferred_axis,
+        "n_edges_found":  len(edges),
+        "adjacent":       top_shards,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -319,6 +527,45 @@ def notion_reservoir_tick(
     return result
 
 
+def notion_reservoir_traverse(
+    shards: str = "dawn-fragments",
+    register: str = "",
+    top_n: int = 2,
+) -> dict[str, Any]:
+    """
+    MCP tool: traverse adjacent edges for one or more comma-separated shards.
+
+    Returns traversal context: top_n adjacent shards per seed shard, ordered
+    by axis match → F_edge → weight → d.  Classifications are fetched live
+    from the Scores DB so the routing decision reflects the current graph heat.
+
+    shards   : comma-separated shard names (e.g. "dawn-fragments,schema-fragments")
+    register : prompt register for axis preference
+               (architectural / charged / recursive / narrative)
+    top_n    : adjacent shards to return per seed (default 2)
+    """
+    shard_list = [s.strip() for s in shards.split(",") if s.strip()]
+    results: list[dict[str, Any]] = []
+    seen_adjacent: set[str] = set()
+    for shard in shard_list:
+        result = notion_traverse(shard=shard, register=register, top_n=top_n)
+        # Deduplicate adjacent across multiple seed shards
+        filtered = [
+            a for a in result.get("adjacent", [])
+            if a["shard"] not in seen_adjacent and a["shard"] not in shard_list
+        ]
+        for a in filtered:
+            seen_adjacent.add(a["shard"])
+        result["adjacent"] = filtered
+        results.append(result)
+    return {
+        "seeds": shard_list,
+        "register": register,
+        "traversals": results,
+        "token_configured": bool(os.environ.get("NOTION_TOKEN")),
+    }
+
+
 def notion_reservoir_state() -> dict[str, Any]:
     """
     MCP tool: return the current registry state (no Notion API call required).
@@ -331,5 +578,7 @@ def notion_reservoir_state() -> dict[str, Any]:
         "edges_db_id": EDGES_DB_ID,
         "scores_collection": SCORES_COLLECTION,
         "cairrn_hub_to_shard": CAIRRN_HUB_TO_SHARD,
+        "shard_to_cairrn_hub": SHARD_TO_CAIRRN_HUB,
+        "register_to_axis": REGISTER_TO_AXIS,
         "token_configured": bool(os.environ.get("NOTION_TOKEN")),
     }

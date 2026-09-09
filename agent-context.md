@@ -58,10 +58,13 @@ Defined in `.agent-context/` — read-only for context, agents follow their cont
 
 ## MCP execution commands
 
-These are separate from the workflow modes — they call the MCP server directly:
+These are separate from the workflow modes — they call the MCP server directly via `run_command`.
+
+Primary umbrellas: `/read <sub>` (inspect) and `/do <sub>` (mutate). Bare `/read` loads vault context.
 
 ```
-/sim /sweep /neg-exp /index /propagate /inject /reset /status /health /test
+/read status  /read index  /read health  /read commands  /read psspps <query>
+/do sim  /do sweep  /do inject  /do reset  /do test  /do commit
 ```
 
 Full catalog → [[COMMANDS]]

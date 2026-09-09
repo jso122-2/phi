@@ -37,6 +37,18 @@ def _agent_context(mode: str) -> dict:
     }
 
 
+@mcp.tool()
+def agent_context(mode: str) -> dict:
+    """
+    Public dispatch entry-point for all workflow modes.
+
+    Called by run_command when the SPECS catalog routes /talk, /read, /dev,
+    /explain, /modular, /wire, /edit, /clean, /audit, /find to
+    agent_context(mode=<name>).
+    """
+    return _agent_context(mode)
+
+
 # ---------------------------------------------------------------------------
 # One named tool per mode — these appear individually in Cursor's / dropdown
 # ---------------------------------------------------------------------------

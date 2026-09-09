@@ -27,14 +27,15 @@ Cursor reads `.cursor/mcp.json` on startup:
 {
   "mcpServers": {
     "spotify-rip": {
-      "command": "mamba",
-      "args": ["run", "-n", "spotify-rip", "--no-capture-output",
-               "python", "-m", "mcp_server.server"],
-      "cwd": "/Users/jacksonmacleod/Documents/Spotify-Rip"
+      "command": "/Users/jack0/mamba/envs/spotify-rip/bin/python",
+      "args": ["-m", "mcp_server.server"],
+      "cwd": "/Users/jack0/Documents/phi"
     }
   }
 }
 ```
+
+File lives at `.cursor/mcp.json` (gitignored; re-create from this if needed).
 
 The server speaks **MCP stdio protocol**.  
 It must be restarted from Cursor settings if `server.py` changes.
@@ -43,25 +44,28 @@ It must be restarted from Cursor settings if `server.py` changes.
 
 ## Tool catalog
 
+Dispatcher (always visible): `run_command`, `list_commands`. Cursor caps the registered tool list at 60; remaining specs stay callable through `run_command`. Full slash catalog → [[COMMANDS]].
+
 | Tool | MCP name | House | Slash command |
 |---|---|---|---|
-| Environment check | `init_check` | clean | `/health` |
-| Double-well sim | `double_well_sim` | talk | `/sim <x0>` |
-| Neg-exp iteration | `neg_exp_sim` | talk | `/neg-exp <x0>` |
-| Sweep initial conditions | `sweep_attractors` | talk | `/sweep` |
-| Harmonic index state | `harmonic_index_state` | modular | `/index` |
-| Propagate index | `harmonic_propagate` | modular | `/propagate [steps]` |
-| Hub state | `hub_state` | modular | — |
-| Inject activation | `harmonic_inject` | edit | `/inject <shard> <value>` |
-| Hub inject | `hub_inject` | edit | — |
-| Reset index | `harmonic_reset` | clean | `/reset` |
-| Run tests | `run_tests` | dev | `/test` |
-| PSSPPS query | `psspps_query` | wire | — |
-| System health | `system_status` | clean | `/status` |
-| DOM queue state | `dom_queue_state` | clean | — |
-| List hooks | `list_hooks` | clean | — |
-| Register hook | `register_hook` | clean | — |
-| Vault hub state | `vault_hub_state` | clean | — |
+| List slash catalog | `list_commands` | clean | `/read commands` |
+| Dispatch a slash | `run_command` | clean | `/read …` `/do …` |
+| Environment check | `init_check` | clean | `/read health` |
+| Double-well sim | `double_well_sim` | talk | `/do sim <x0>` |
+| Neg-exp iteration | `neg_exp_sim` | talk | `/do neg-exp <x0>` |
+| Sweep initial conditions | `sweep_attractors` | talk | `/do sweep` |
+| Harmonic index state | `harmonic_index_state` | modular | `/read index` |
+| Propagate index | `harmonic_propagate` | modular | `/do propagate [steps]` |
+| Hub state | `hub_state` | modular | `/read hub` |
+| Inject activation | `harmonic_inject` | edit | `/do inject <shard> <value>` |
+| Hub inject | `hub_inject` | edit | `/do hub-inject` |
+| Reset index | `harmonic_reset` | clean | `/do reset` |
+| Run tests | `run_tests` | dev | `/do test` |
+| PSSPPS query | `psspps_query` | wire | `/read psspps <query>` |
+| System health | `system_status` | clean | `/read status` |
+| DOM queue state | `dom_queue_state` | clean | `/read queue` |
+| List hooks | `list_hooks` | clean | `/read hooks` |
+| Vault hub state | `vault_hub_state` | clean | `/read vault` |
 
 ---
 

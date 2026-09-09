@@ -14,7 +14,7 @@ from mcp_server.bus.tasks import TASKS
 @requires_init
 def bus_submit(task: str, payload_json: str = "{}") -> dict[str, Any]:
     """
-    Enqueue a celery/mmap job and return its job_id immediately.
+    Enqueue a scheduler job and return its job_id immediately.
 
     Parameters
     ----------
@@ -74,10 +74,10 @@ def bus_wait(job_id: str, timeout_s: float = 30.0) -> dict[str, Any]:
 @requires_init
 def bus_restart() -> dict[str, Any]:
     """
-    Kill the stale bus worker, reset the mmap rings, and spawn a fresh worker.
+    Restart the in-process bus scheduler and clear queued jobs.
 
-    Use when bus_status shows worker_alive=false. Clears backed-up dispatch
-    jobs (they were never consumed), then starts a clean worker subprocess.
+    Use when bus_status shows worker_alive=false. Drops in-flight and
+    queued work, then starts a fresh scheduler thread.
     """
     with _dom_queue.gate("bus_restart"):
         from mcp_server.bus.host import restart_worker
@@ -90,7 +90,7 @@ def bus_restart() -> dict[str, Any]:
 
 @mcp.tool()
 def bus_status() -> dict[str, Any]:
-    """Mmap ring + celery worker snapshot. Init-free."""
+    """Singleton scheduler snapshot. Init-free."""
     with _dom_queue.gate("bus_status"):
         client = get_client()
         from mcp_server.bus.guardian import guardian_alive

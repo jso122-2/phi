@@ -307,15 +307,15 @@ SPECS: tuple[CommandSpec, ...] = (
     _mcp("shuffle-state", "shuffle_state", _SHUF, "Inspect shuffle + gate state."),
 
     # -- bus / forecast / audit --------------------------------------------
-    _mcp("bus-submit", "bus_submit", _BUS, "Enqueue a mmap/celery bus job.",
+    _mcp("bus-submit", "bus_submit", _BUS, "Enqueue a scheduler bus job.",
          positionals=("task",), rest="payload_json"),
     _mcp("bus-poll", "bus_poll", _BUS, "Poll a bus job by id.",
          positionals=("job_id",), init_free=True),
     _mcp("bus-wait", "bus_wait", _BUS, "Wait for a bus job.",
          positionals=("job_id",), types={"timeout_s": "float"},
          flag_map={"timeout": "timeout_s"}),
-    _mcp("bus-status", "bus_status", _BUS, "Mmap ring + worker snapshot.", init_free=True),
-    _mcp("bus-restart", "bus_restart", _BUS, "Restart the bus worker."),
+    _mcp("bus-status", "bus_status", _BUS, "Singleton scheduler snapshot.", init_free=True),
+    _mcp("bus-restart", "bus_restart", _BUS, "Restart the bus scheduler."),
     _mcp("forecast", "forecast_state", _FORE, "Forecast pocket snapshot.", init_free=True),
     _mcp("code-audit", "code_audit", _MOD, "Read-only code structure audit.",
          positionals=("target",), optional=("mode",)),

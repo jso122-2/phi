@@ -1,4 +1,4 @@
-"""spotify-rip MCP server — thin stdio dispatcher over the mmap/celery bus."""
+"""spotify-rip MCP server — stdio transport over the singleton bus scheduler."""
 from __future__ import annotations
 
 import logging

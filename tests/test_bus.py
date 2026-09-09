@@ -1,18 +1,30 @@
-"""Mmap/celery bus: SharedMmapPipe + in-process consumer (no celery required)."""
+"""Singleton bus scheduler + leftover toggle/guardian contracts."""
 from __future__ import annotations
 
 import json
 import os
-import threading
-import time
 from pathlib import Path
 
 import pytest
 
-from mcp_server.bus.client import BusClient, bind_client, save_job
-from mcp_server.bus.runtime import RING_CAPACITY, RING_SLOT_SIZE
+from mcp_server.bus.client import BusClient, bind_client, get_client, worker_alive
+from mcp_server.bus.scheduler import ensure_scheduler, reset_scheduler
 from mcp_server.bus.tasks import TASKS, run_task
 from pipeline.bridge.mmap_pipe import SharedMmapPipe
+
+
+@pytest.fixture(autouse=True)
+def _isolated_scheduler(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from mcp_server.bus import scheduler as sched_mod
+
+    monkeypatch.setattr(sched_mod, "jobs_dir", lambda: tmp_path / "jobs")
+    monkeypatch.setattr(sched_mod, "pid_path", lambda: tmp_path / "worker.pid")
+    monkeypatch.setattr(sched_mod, "runtime_dir", lambda: tmp_path)
+    reset_scheduler()
+    yield
+    reset_scheduler()
+    import mcp_server.bus.client as client_mod
+    client_mod._client = None
 
 
 def test_shared_mmap_roundtrip(tmp_path: Path):
@@ -37,61 +49,66 @@ def test_shared_mmap_fifo_two_handles(tmp_path: Path):
     r.close()
 
 
-def _inproc_consumer(dispatch: SharedMmapPipe, complete: SharedMmapPipe, stop: threading.Event):
-    from mcp_server.bus.client import load_job, save_job
-    from mcp_server.bus.tasks import run_task
-
-    while not stop.is_set():
-        try:
-            raw = dispatch.get(timeout=0.1)
-        except RuntimeError:
-            break
-        if raw is None:
-            continue
-        msg = json.loads(raw)
-        rec = load_job(msg["job_id"]) or {"job_id": msg["job_id"], "task": msg["task"], "kwargs": {}}
-        rec["status"] = "done"
-        rec["result"] = run_task(msg["task"], rec.get("kwargs") or {})
-        save_job(rec)
-        complete.put(json.dumps({"job_id": msg["job_id"], "ok": True}).encode(), timeout=1.0)
-
-
-def test_bus_submit_and_wait_echo(tmp_path: Path, monkeypatch):
-    from mcp_server.bus import runtime as rt
-    monkeypatch.setattr(rt, "runtime_dir", lambda: tmp_path)
-    monkeypatch.setattr(rt, "dispatch_path", lambda: tmp_path / "dispatch.ring")
-    monkeypatch.setattr(rt, "complete_path", lambda: tmp_path / "complete.ring")
-    monkeypatch.setattr(rt, "jobs_dir", lambda: tmp_path / "jobs")
-    (tmp_path / "jobs").mkdir()
-
-    from mcp_server.bus import client as client_mod
-    monkeypatch.setattr(client_mod, "dispatch_path", lambda: tmp_path / "dispatch.ring")
-    monkeypatch.setattr(client_mod, "complete_path", lambda: tmp_path / "complete.ring")
-    monkeypatch.setattr(client_mod, "jobs_dir", lambda: tmp_path / "jobs")
-    monkeypatch.setattr(client_mod, "pid_path", lambda: tmp_path / "worker.pid")
-
-    dispatch = SharedMmapPipe(tmp_path / "dispatch.ring", RING_CAPACITY, RING_SLOT_SIZE, create=True)
-    complete = SharedMmapPipe(tmp_path / "complete.ring", RING_CAPACITY, RING_SLOT_SIZE, create=True)
-    client = BusClient(dispatch, complete)
-    bind_client(client)
-
+def test_scheduler_submit_and_wait_echo():
     TASKS["test.echo"] = lambda msg="": {"echo": msg}
-    stop = threading.Event()
-    t = threading.Thread(target=_inproc_consumer, args=(dispatch, complete, stop), daemon=True)
-    t.start()
     try:
+        sched = ensure_scheduler()
+        client = BusClient(sched)
+        bind_client(client)
         ticket = client.submit("test.echo", {"msg": "ping"})
         rec = client.wait(ticket["job_id"], timeout=5.0)
         assert rec is not None
         assert rec["status"] == "done"
         assert rec["result"]["echo"] == "ping"
+        assert worker_alive()
+        snap = client.status()
+        assert snap["scheduler"] == "inproc"
+        assert snap["worker_alive"] is True
     finally:
-        stop.set()
-        t.join(timeout=1.0)
         TASKS.pop("test.echo", None)
-        client.close()
-        import mcp_server.bus.client as client_mod
-        client_mod._client = None
+
+
+def test_get_client_starts_scheduler():
+    client = get_client()
+    assert client is not None
+    assert client.alive
+    assert worker_alive()
+
+
+def test_scheduler_restart_clears_queue():
+    TASKS["test.echo"] = lambda msg="": {"echo": msg}
+    try:
+        sched = ensure_scheduler()
+        client = BusClient(sched)
+        bind_client(client)
+        first = client.submit("test.echo", {"msg": "old"})
+        rec = client.wait(first["job_id"], timeout=5.0)
+        assert rec is not None and rec["status"] == "done"
+        from mcp_server.bus.host import restart_worker
+
+        snap = restart_worker()
+        assert snap["worker_alive"] is True
+        assert snap["dispatch_qsize"] == 0
+        assert client.poll(first["job_id"]) is None
+        ticket = client.submit("test.echo", {"msg": "new"})
+        rec = client.wait(ticket["job_id"], timeout=5.0)
+        assert rec is not None
+        assert rec["result"]["echo"] == "new"
+    finally:
+        TASKS.pop("test.echo", None)
+
+
+def test_scheduler_purges_stale_job_files(tmp_path: Path):
+    jobs = tmp_path / "jobs"
+    jobs.mkdir()
+    stale = jobs / "deadbeef.json"
+    stale.write_text(json.dumps({"job_id": "deadbeef", "status": "queued"}), encoding="utf-8")
+
+    reset_scheduler()
+    sched = ensure_scheduler()
+    assert not stale.exists()
+    assert sched.snapshot()["purged_job_files"] == 1
+    assert sched.snapshot()["n_job_files"] == 0
 
 
 def test_warmup_tasks_registered():

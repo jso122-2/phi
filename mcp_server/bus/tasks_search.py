@@ -68,9 +68,10 @@ def search_psspps(
         # hub_distribution → side_effects.pulse_hubs → harmonic injection
         "hub_distribution": hub_distribution,
         "pulse_scale": 0.08,   # gentle: each top doc adds 0.08 to its hub
-        # notion_tick_shards → side_effects → notion.tick bus task
+        # notion_tick_shards → side_effects → notion.tick + notion.traverse bus tasks
         "notion_tick_shards": notion_tick_shards,
         "notion_tick_note": f"psspps:{query[:80]}",
+        "notion_register": (modulation or {}).get("register", ""),
         # standard vault_sim for _vault_hub push
         "vault_sim_tool": "psspps_query",
         "vault_sim": {

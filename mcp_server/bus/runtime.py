@@ -1,4 +1,4 @@
-"""Paths for the mmap rings, job files, celery broker, and worker pid."""
+"""Runtime paths — leftover rings/job files from the old stdio worker, plus pid."""
 from __future__ import annotations
 
 from pathlib import Path

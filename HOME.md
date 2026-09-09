@@ -72,19 +72,23 @@ HOME
 
 ## Quick commands — MCP tools (execute immediately)
 
+Call `run_command`. Full catalog → [[COMMANDS]].
+
 ```
-/status          system health report
-/sim 1.5         run double-well from x0 = 1.5
-/sweep           sweep x0 across [−4, +4]
-/index           harmonic index state
-/propagate 5     advance index 5 cycles
-/reset           zero all activations
-/test            run pytest suite
-/psspps <query>  perspective-oriented RAG query against the vault
-/graph-commit    commit this session as a vault node (replaces git push)
-/graph-clean     scan for orphan nodes and dead links
-/graph-link      auto-link semantically related nodes
-/graph-status    full graph health report
+/read status              system health report
+/read index               harmonic index state
+/read health              environment / gate check
+/read psspps <query>      perspective-oriented RAG query
+/read find <query>        Pericles exact vault retrieval
+/read graph               vault graph health
+/read commands            list every slash command
+/do sim 1.5               double-well from x0 = 1.5
+/do sweep                 sweep x0 across [−4, +4]
+/do propagate 5           advance index 5 cycles
+/do reset                 re-seed ring to HOME floor
+/do test                  run pytest suite
+/do commit …              session → vault node
+/do cairrn HOME 1.0       CAIRRN pipeline for one hub
 ```
 
 ## Quick commands — workflow modes (load behaviour context)
