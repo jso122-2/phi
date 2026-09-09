@@ -25,7 +25,13 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
-from workers.cairrn import f_crystallisation, f_edge_volatility, f_shimmer_decay, f_shimmer_base
+from workers.cairrn import (
+    f_crystallisation,
+    f_edge_volatility,
+    f_shimmer_decay,
+    f_shimmer_base,
+    f_ash_yield,
+)
 
 # ---------------------------------------------------------------------------
 # Shard registry — sourced from Notion workspace
@@ -82,6 +88,15 @@ _shard_activations_prev: list[float] = []  # activation vector from the last non
 SHIMMER_LAM: float = 0.1   # decay rate λ — controls how fast the floor drops with Et
 SHIMMER_PHI: float = 0.2   # hysteresis factor φ — scales the pressure floor
 SHIMMER_EPS: float = 0.05  # epsilon — width of the f_shimmer_base delta window
+
+# f_ash_yield constants — Arrhenius heat drain diagnostic.
+ASH_BASE: float = 1.0          # baseline ash yield at T = T_min
+ASH_K: float = 0.5             # Arrhenius growth coefficient
+ASH_T_MIN: float = 1.0         # V_edge below this → no excess ash
+ASH_DRAIN_THRESHOLD: float = 2.0   # ash above this → shard is "draining"
+
+# Module-level ash drain counter — keyed by shard_page_id.
+_ash_drain_count: dict[str, int] = {}
 
 # CAIRRN hub → reservoir shard routing.
 # Keys are the live harmonic-index hub names (HOME / MATH / CODE / COMMANDS /
@@ -242,7 +257,7 @@ def notion_tick(
     token: Notion integration token (falls back to NOTION_TOKEN env var)
     dry_run: compute and return payload without writing to Notion
     """
-    global _shard_activations_prev
+    global _shard_activations_prev, _ash_drain_count
 
     # --- Outer guard: ring volatility gate (f_edge_volatility) ---
     # Must fire BEFORE the Si_delta gate (Phase C).  High V_edge means the
@@ -251,6 +266,7 @@ def notion_tick(
     all_shard_names = list(SHARD_REGISTRY.keys())
     activated_set = set(activated_shards)
     cur_activations = [1.0 if s in activated_set else 0.0 for s in all_shard_names]
+    v_edge = 0.0  # default for first tick (no previous activations to diff against)
     if _shard_activations_prev:
         edge_deltas = [abs(c - p) for c, p in zip(cur_activations, _shard_activations_prev)]
         v_edge = f_edge_volatility(edge_deltas, w=1.0)
@@ -266,9 +282,22 @@ def notion_tick(
                 "scores_updated": [],
                 "si_skipped": [],
                 "shimmer_base": {},
+                "ash_yield": 0.0,
+                "ash_drain_count": {},
                 "errors": [],
                 "write_mode": "suppressed",
             }
+
+    # --- Ash yield (f_ash_yield) — Arrhenius heat drain diagnostic ---
+    # Uses v_edge as the temperature proxy: exponential ash accumulation when
+    # the ring runs hot above ASH_T_MIN.
+    ash = f_ash_yield(ASH_BASE, ASH_K, v_edge, ASH_T_MIN)
+    if ash > ASH_DRAIN_THRESHOLD:
+        for _n in activated_shards:
+            _reg_n = SHARD_REGISTRY.get(_n)
+            if _reg_n:
+                _spid = _reg_n["shard_page_id"]
+                _ash_drain_count[_spid] = _ash_drain_count.get(_spid, 0) + 1
 
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     to_a = len(activated_shards)  # global sum after this tick
@@ -280,6 +309,8 @@ def notion_tick(
         "scores_updated": [],
         "si_skipped": [],
         "shimmer_base": {},
+        "ash_yield": ash,
+        "ash_drain_count": _ash_drain_count.copy(),
         "errors": [],
     }
 
