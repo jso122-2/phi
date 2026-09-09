@@ -154,16 +154,19 @@ class TestUmbrella:
         assert p.tool == "psspps_query"
         assert p.kwargs["query"] == "Lambert W fixed point"
 
-    def test_read_bare_is_workflow(self):
+    def test_read_bare_dispatches_agent_context(self):
         p = parse_command("/read")
-        assert p.kind == "workflow"
-        assert p.context_file is None
-        assert p.kwargs == {}
+        assert p.kind == "mcp"
+        assert p.tool == "agent_context"
+        assert p.kwargs.get("mode") == "read"
 
-    def test_read_topic_is_workflow(self):
+    def test_read_unknown_sub_dispatches_agent_context(self):
+        # Unrecognised sub-command falls back to agent_context(mode="read"),
+        # consistent with how /talk, /dev, etc. behave.
         p = parse_command("/read math")
-        assert p.kind == "workflow"
-        assert p.kwargs.get("topic") == "math"
+        assert p.kind == "mcp"
+        assert p.tool == "agent_context"
+        assert p.kwargs.get("mode") == "read"
 
     def test_read_help_lists(self):
         p = parse_command("/read help")

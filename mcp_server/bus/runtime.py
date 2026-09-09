@@ -1,6 +1,7 @@
 """Paths for the mmap rings, job files, celery broker, and worker pid."""
 from __future__ import annotations
 
+import time as _time
 from pathlib import Path
 
 from graph.node import VAULT_ROOT
@@ -64,3 +65,24 @@ def ensure_runtime() -> Path:
     for sub in ("in", "out", "processed", "results"):
         (celery_dir() / sub).mkdir(parents=True, exist_ok=True)
     return root
+
+
+def purge_old_jobs(max_age_hours: int = 24) -> int:
+    """Delete job JSON files older than *max_age_hours*.
+
+    Returns the number of files deleted.  Silent on individual file errors so
+    a locked or already-deleted file never aborts the sweep.
+    """
+    cutoff = _time.time() - max_age_hours * 3600
+    deleted = 0
+    try:
+        for path in jobs_dir().glob("*.json"):
+            try:
+                if path.stat().st_mtime < cutoff:
+                    path.unlink(missing_ok=True)
+                    deleted += 1
+            except OSError:
+                pass
+    except OSError:
+        pass
+    return deleted

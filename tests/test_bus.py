@@ -100,6 +100,44 @@ def test_warmup_tasks_registered():
     assert "graph.ingest_source" in TASKS
 
 
+def test_purge_old_jobs_deletes_stale_files(tmp_path: Path, monkeypatch):
+    """purge_old_jobs removes files whose mtime is older than the threshold."""
+    from mcp_server.bus import runtime as rt
+    jobs = tmp_path / "jobs"
+    jobs.mkdir()
+    monkeypatch.setattr(rt, "jobs_dir", lambda: jobs)
+
+    # Create 3 "old" job files and 1 "fresh" file.
+    old_mtime = time.time() - 48 * 3600  # 48 hours ago
+    for i in range(3):
+        p = jobs / f"old_{i}.json"
+        p.write_text("{}")
+        os.utime(p, (old_mtime, old_mtime))
+
+    fresh = jobs / "fresh.json"
+    fresh.write_text("{}")
+
+    from mcp_server.bus.runtime import purge_old_jobs
+    deleted = purge_old_jobs(max_age_hours=24)
+
+    assert deleted == 3
+    assert not (jobs / "old_0.json").exists()
+    assert not (jobs / "old_1.json").exists()
+    assert not (jobs / "old_2.json").exists()
+    assert fresh.exists()  # untouched
+
+
+def test_purge_old_jobs_empty_dir(tmp_path: Path, monkeypatch):
+    """purge_old_jobs is silent and returns 0 on an empty directory."""
+    from mcp_server.bus import runtime as rt
+    jobs = tmp_path / "jobs"
+    jobs.mkdir()
+    monkeypatch.setattr(rt, "jobs_dir", lambda: jobs)
+
+    from mcp_server.bus.runtime import purge_old_jobs
+    assert purge_old_jobs(max_age_hours=1) == 0
+
+
 def test_unknown_task_raises():
     with pytest.raises(KeyError):
         run_task("no.such.task", {})

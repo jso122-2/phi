@@ -81,9 +81,11 @@ def bus_restart() -> dict[str, Any]:
     """
     with _dom_queue.gate("bus_restart"):
         from mcp_server.bus.host import restart_worker
+        from mcp_server.bus.runtime import purge_old_jobs
         try:
             snap = restart_worker()
-            return {"status": "restarted", **snap}
+            purged = purge_old_jobs(max_age_hours=24)
+            return {"status": "restarted", "purged_jobs": purged, **snap}
         except Exception as exc:
             return {"status": "error", "error": str(exc)}
 

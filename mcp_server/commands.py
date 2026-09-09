@@ -512,17 +512,11 @@ def _parse_read(raw: str, rest: str) -> ParsedCommand:
         slash = _resolve_sub("read", sub.lower())
         if slash is not None:
             return _from_spec(raw, CATALOG[slash], remainder)
-    spec = CATALOG["read"]
-    kwargs: dict[str, Any] = {"topic": rest.strip()} if rest.strip() else {}
-    return ParsedCommand(
-        raw=raw,
-        slash="read",
-        kind="workflow",
-        context_file=spec.context_file,
-        description=spec.description,
-        init_free=True,
-        kwargs=kwargs,
-    )
+    # Bare /read (no sub or unrecognised sub) — dispatch to agent_context(mode="read")
+    # exactly like /talk, /dev, etc.  The CATALOG["read"] spec already has
+    # tool="agent_context" and defaults={"mode": "read"}, so _from_spec produces
+    # kind="mcp" for free.  (The legacy kind="workflow" path was migration debris.)
+    return _from_spec(raw, CATALOG["read"], rest)
 
 
 def _parse_do(raw: str, rest: str) -> ParsedCommand:
