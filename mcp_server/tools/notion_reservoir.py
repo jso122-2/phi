@@ -25,7 +25,7 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
-from workers.cairrn import f_crystallisation, f_edge_volatility
+from workers.cairrn import f_crystallisation, f_edge_volatility, f_shimmer_decay
 
 # ---------------------------------------------------------------------------
 # Shard registry — sourced from Notion workspace
@@ -77,6 +77,11 @@ _r_node_prev: dict[str, float] = {}
 V_EDGE_SUPPRESS_THRESHOLD: float = 2.0   # tune as needed — ring is volatile above this
 _shard_activations_prev: list[float] = []  # activation vector from the last non-suppressed tick
 
+# f_shimmer_decay tuning constants (Layer 6 — D(t) hysteresis floor on Ns2).
+# shimmer_t = A · exp(−λ · t) + p · φ_hysteresis
+SHIMMER_LAM: float = 0.1   # decay rate λ — controls how fast the floor drops with Et
+SHIMMER_PHI: float = 0.2   # hysteresis factor φ — scales the pressure floor
+
 # CAIRRN hub → reservoir shard routing.
 # Keys are the live harmonic-index hub names (HOME / MATH / CODE / COMMANDS /
 # agent-context).  Values are SHARD_REGISTRY keys.
@@ -127,6 +132,22 @@ def compute_scores(
     ec  = qe * si
     ns1 = idx * ec
     ns2 = abs(ec / et) - math.exp(ss) if et else -math.exp(ss)
+    # D(t) hysteresis floor (Layer 6 — f_shimmer_decay).
+    # A hot shard under pressure should not decay to zero.  shimmer_floor
+    # provides an exponentially-decaying floor with a pressure-weighted tail.
+    #   A   = raw signal amplitude (|Ec/Et|)
+    #   t   = Et — edge activation threshold used as elapsed-time proxy
+    #   p   = 0.5 — constant pressure proxy (TODO: wire real shard pressure)
+    #   φ   = SHIMMER_PHI
+    _shimmer_A = abs(ec / et) if et else 0.0
+    shimmer_floor = f_shimmer_decay(
+        A=_shimmer_A,
+        lam=SHIMMER_LAM,
+        t=et,
+        p=0.5,  # TODO: replace with live pressure signal (shard coherence or activation level)
+        phi_hysteresis=SHIMMER_PHI,
+    )
+    ns2 = max(ns2, shimmer_floor)
     ns3 = abs(ta - to_a) / max(ss, 0.01)
     cls = _classify(ns1, ns2, ns3, qe, qe_adj)
     return {
