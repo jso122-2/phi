@@ -31,6 +31,27 @@ def _enqueue_warmups() -> None:
         pass
 
 
+def _start_health_watchdog() -> None:
+    """Daemon thread: poll worker liveness every 5 s, restart on death."""
+    import threading
+    import time
+
+    def _loop() -> None:
+        from mcp_server.bus.client import worker_alive
+        from mcp_server.bus.host import restart_worker
+
+        while True:
+            time.sleep(5)
+            try:
+                if not worker_alive():
+                    restart_worker()
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_loop, daemon=True, name="bus-health-watchdog")
+    t.start()
+
+
 def main() -> None:
     from mcp_server.bus.host import BusHost
 
@@ -50,6 +71,7 @@ def main() -> None:
 
         signal.signal(signal.SIGTERM, _on_term)
         _enqueue_warmups()
+        _start_health_watchdog()
         mcp.run()
     except KeyboardInterrupt:
         sys.exit(0)

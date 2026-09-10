@@ -152,10 +152,11 @@ class BusHost:
                     os.kill(pid, signal.SIGTERM)
                 except OSError:
                     pass
-        try:
-            pid_path().unlink(missing_ok=True)
-        except OSError:
-            pass
+        if self._proc is not None:
+            try:
+                pid_path().unlink(missing_ok=True)
+            except OSError:
+                pass
         self.client.close()
 
     def snapshot(self) -> dict:
