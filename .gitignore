@@ -27,8 +27,9 @@ htmlcov/
 # Embedding / MiniLM cache (rebuilt locally)
 .cache/
 
-# Nested Cursor dir — workspace rules live at repo-root .cursor/
-.cursor/
+# Nested Cursor dir — workspace rules stay local; share MCP so every clone gets it
+.cursor/*
+!.cursor/mcp.json
 
 # Runtime mycelial / tracer logs (rewritten every tick)
 agent-log/*.txt

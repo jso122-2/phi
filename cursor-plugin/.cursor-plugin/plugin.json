@@ -1,0 +1,28 @@
+{
+  "name": "spotify-rip",
+  "version": "0.1.0",
+  "description": "Remote Streamable HTTP MCP for phi / spotify-rip. One hosted server for every machine and Cloud Agent.",
+  "author": {
+    "name": "jack dev",
+    "email": "jacksonorloff@gmail.com"
+  },
+  "repository": "https://github.com/jso122-2/phi",
+  "keywords": ["mcp", "spotify-rip", "phi", "cairrn"],
+  "mcpServers": "mcp.json",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "MCP_URL": {
+        "type": "string",
+        "title": "MCP URL",
+        "description": "Streamable HTTP endpoint, including /mcp (example: https://mcp.example.com/mcp)"
+      },
+      "MCP_TOKEN": {
+        "type": "string",
+        "title": "MCP bearer token",
+        "description": "Same value as SPOTIFY_RIP_MCP_TOKEN on the host process"
+      }
+    },
+    "required": ["MCP_URL", "MCP_TOKEN"]
+  }
+}

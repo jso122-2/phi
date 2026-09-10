@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "spotify-rip": {
+      "url": "${MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${MCP_TOKEN}"
+      }
+    }
+  }
+}

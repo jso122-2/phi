@@ -1,0 +1,17 @@
+{
+  "name": "phi-mcp",
+  "owner": {
+    "name": "jack dev",
+    "email": "jacksonorloff@gmail.com"
+  },
+  "metadata": {
+    "description": "spotify-rip MCP for every Cursor machine and Cloud Agent on this team"
+  },
+  "plugins": [
+    {
+      "name": "spotify-rip",
+      "source": "cursor-plugin",
+      "description": "Remote Streamable HTTP MCP for the phi / spotify-rip vault tools"
+    }
+  ]
+}
