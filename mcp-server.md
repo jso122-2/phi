@@ -32,7 +32,26 @@ python -m mcp_server.server --transport streamable-http --host 0.0.0.0 --port 80
 
 Put that process on a URL every machine can reach (`https://HOST/mcp`). Set the same token on the host. Env: `SPOTIFY_RIP_MCP_TRANSPORT`, `SPOTIFY_RIP_MCP_TOKEN`, `SPOTIFY_RIP_MCP_HOST`, `SPOTIFY_RIP_MCP_PORT` / `PORT`. Local HTTP without auth: `--allow-anon`. `GET /health` is public. SSE is not used (Cloud Agents reject it).
 
-### 2. Every clone / IDE / CLI (git)
+### 2. Your laptop (and every other machine) — automatic on workspace open
+
+Opening this repo in Cursor on **any** machine fires the `workspaceOpen` hook, which runs `.cursor/hooks/install_mcp_global.sh`. The script merges `spotify-rip` into `~/.cursor/mcp.json` so the server is available in **every** Cursor project on that laptop, not just this repo.
+
+Env vars needed on the machine (add to `~/.zshrc` / `~/.bashrc` / system env):
+
+```bash
+export SPOTIFY_RIP_MCP_URL=https://HOST/mcp
+export SPOTIFY_RIP_MCP_TOKEN=<same token as the host>
+```
+
+To run it manually on a machine that has the repo but hasn't opened it yet:
+
+```bash
+python scripts/setup_mcp.py
+# or with explicit values:
+python scripts/setup_mcp.py --url https://HOST/mcp --token <TOKEN>
+```
+
+### 3. Every clone / IDE / CLI (git)
 
 Committed `.cursor/mcp.json` (same as `mcp.cloud.example.json`):
 
