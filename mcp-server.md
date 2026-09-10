@@ -21,7 +21,7 @@ The MCP server — exposes all sims and workers as tools that Cursor (or any MCP
 
 ## Registration
 
-Cursor reads `.cursor/mcp.json` on startup:
+Cursor desktop reads `.cursor/mcp.json` on startup (stdio, local process):
 
 ```json
 {
@@ -36,8 +36,36 @@ Cursor reads `.cursor/mcp.json` on startup:
 }
 ```
 
-The server speaks **MCP stdio protocol**.  
-It must be restarted from Cursor settings if `server.py` changes.
+**Cursor Cloud Agents** cannot use that local stdio spawn. They need **Streamable HTTP** (SSE is not supported). Run the same process as a remote server:
+
+```bash
+export SPOTIFY_RIP_MCP_TOKEN='…long random secret…'
+python -m mcp_server.server --transport streamable-http --host 0.0.0.0 --port 8000
+```
+
+Copy `mcp.cloud.example.json` into the Cloud Agents MCP dropdown (or project `.cursor/mcp.json` for desktop HTTP):
+
+```json
+{
+  "mcpServers": {
+    "spotify-rip": {
+      "url": "https://YOUR_HOST/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:SPOTIFY_RIP_MCP_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+| Mode | Transport | Who starts it |
+|---|---|---|
+| Desktop default | stdio | Cursor spawns `python -m mcp_server.server` |
+| Cloud Agents | Streamable HTTP (`/mcp`) | You host it; Cursor proxies tool calls |
+
+HTTP binds `0.0.0.0:8000` by default, requires a bearer token, and exposes unauthenticated `GET /health`. Aliases for `--transport`: `http`, `cloud`, `streamable-http`. Env: `SPOTIFY_RIP_MCP_TRANSPORT`, `SPOTIFY_RIP_MCP_TOKEN`, `SPOTIFY_RIP_MCP_HOST`, `SPOTIFY_RIP_MCP_PORT` / `PORT`. Local HTTP without auth: `--allow-anon`.
+
+The stdio server must be restarted from Cursor settings if `server.py` changes.
 
 ---
 
@@ -124,10 +152,13 @@ _vault_hub      = open_vault_hub(…)  # writes Spotify-rip/live-state.md
 
 ```bash
 mamba activate spotify-rip
-spotify-rip-mcp          # via console_scripts entry point
+spotify-rip-mcp          # via console_scripts entry point (stdio)
 
 # or
 python -m mcp_server.server
+
+# Cloud / remote (Streamable HTTP on :8000/mcp)
+SPOTIFY_RIP_MCP_TOKEN=… python -m mcp_server.server --transport cloud
 ```
 
 ---
