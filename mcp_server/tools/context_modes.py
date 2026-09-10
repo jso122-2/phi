@@ -15,7 +15,7 @@ _CTX_DIR = Path(__file__).resolve().parent.parent.parent / ".ai_agent_context"
 
 MODES: frozenset[str] = frozenset({
     "talk", "explain", "dev", "modular", "wire",
-    "edit", "clean", "audit", "read", "find",
+    "edit", "clean", "audit", "diagnose", "read", "find",
 })
 
 
@@ -113,6 +113,16 @@ def audit() -> dict:
     return _agent_context("audit")
 
 
+def diagnose() -> dict:
+    """
+    /diagnose — Targeted diagnose and evaluate.
+
+    Not @mcp.tool() — Cursor catalog cap is 60. Dispatched via
+    run_command("/diagnose") → agent_context(mode="diagnose").
+    """
+    return _agent_context("diagnose")
+
+
 @mcp.tool()
 def read_mode() -> dict:
     """
@@ -141,7 +151,7 @@ def agent_context(mode: str) -> dict:
 
     Called by command.py via getattr(mod, "agent_context") when run_command
     routes /talk, /read, /dev, /explain, /modular, /wire, /edit, /clean,
-    /audit, /find to agent_context(mode=<name>).
+    /audit, /diagnose, /evaluate, /find to agent_context(mode=<name>).
 
     Not decorated with @mcp.tool() — must remain a plain module attribute
     so getattr(mcp_server.tools.context_modes, "agent_context") works.

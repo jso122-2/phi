@@ -63,6 +63,18 @@ class TestParse:
         assert p.kind == "mcp"
         assert p.context_file is None
 
+    def test_workflow_diagnose(self):
+        p = parse_command("/diagnose")
+        assert p.kind == "mcp"
+        assert p.tool == "agent_context"
+        assert p.kwargs.get("mode") == "diagnose"
+
+    def test_workflow_evaluate_alias(self):
+        p = parse_command("/evaluate")
+        assert p.kind == "mcp"
+        assert p.tool == "agent_context"
+        assert p.kwargs.get("mode") == "diagnose"
+
     def test_cairrn_bare_is_hub_state(self):
         p = parse_command("/cairrn")
         assert p.tool == "hub_state"
@@ -242,7 +254,7 @@ class TestHookHandlers:
         assert out["permission"] == "deny"
 
     def test_shell_allows_normal(self):
-        out = handle_shell({"command": "ls Spotify-rip"})
+        out = handle_shell({"command": "ls graph"})
         assert out["permission"] == "allow"
 
     def test_mcp_pre_annotates(self):
