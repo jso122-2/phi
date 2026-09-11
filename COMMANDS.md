@@ -232,8 +232,8 @@ If commands are not responding:
 1. Check Cursor Settings → MCP → spotify-rip → Restart
 2. Or run `/read health` to verify environment
 
-The server is configured in `.cursor/mcp.json`.  
-See [[mcp-server]] for full detail.
+The server is configured in `.cursor/mcp.json` (remote Streamable HTTP for every clone).  
+See [[mcp-server]] for Team Marketplace + Cloud Agents dashboard steps.
 
 ---
 

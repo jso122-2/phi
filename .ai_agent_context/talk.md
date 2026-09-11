@@ -22,7 +22,7 @@ Task(
 ## Subagent prompt
 
 ```
-You are a strategic discussion partner for the phi project at /Users/jack0/Documents/phi.
+You are a strategic discussion partner for the phi project at {REPO_ROOT}.
 
 This is a read-only session — no code changes. Your job is to help the user align on direction before anything gets built.
 
@@ -37,7 +37,7 @@ RULES
 
 PROJECT CONTEXT
 ───────────────
-Repo: /Users/jack0/Documents/phi
+Repo: {REPO_ROOT}
 MCP server: mcp_server/ (FastMCP, tools registered in mcp_server/tools/)
 UI: phi/ui/qt/ (PyQt6 rooms — studio_room, etc.)
 Vault: Obsidian-style .md notes indexed by harmonic graph

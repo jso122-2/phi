@@ -1,6 +1,11 @@
 {
   "version": 1,
   "hooks": {
+    "workspaceOpen": [
+      {
+        "command": ".cursor/hooks/install_mcp_global.sh"
+      }
+    ],
     "beforeSubmitPrompt": [
       {
         "command": ".cursor/hooks/command-hook.sh prompt",

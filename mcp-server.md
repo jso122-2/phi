@@ -21,23 +21,77 @@ The MCP server — exposes all sims and workers as tools that Cursor (or any MCP
 
 ## Registration
 
-Cursor reads `.cursor/mcp.json` on startup:
+One hosted Streamable HTTP process. Every Cursor client points at the same `url`. A Cursor **Profile** (`cursor.com/@handle`) does not copy MCP to other logins — a **Team** does.
+
+### 1. Host the server (once)
+
+```bash
+export SPOTIFY_RIP_MCP_TOKEN='…long random secret…'
+python -m mcp_server.server --transport streamable-http --host 0.0.0.0 --port 8000
+```
+
+Put that process on a URL every machine can reach (`https://HOST/mcp`). Set the same token on the host. Env: `SPOTIFY_RIP_MCP_TRANSPORT`, `SPOTIFY_RIP_MCP_TOKEN`, `SPOTIFY_RIP_MCP_HOST`, `SPOTIFY_RIP_MCP_PORT` / `PORT`. Local HTTP without auth: `--allow-anon`. `GET /health` is public. SSE is not used (Cloud Agents reject it).
+
+### 2. Your laptop (and every other machine) — automatic on workspace open
+
+Opening this repo in Cursor on **any** machine fires the `workspaceOpen` hook, which runs `.cursor/hooks/install_mcp_global.sh`. The script merges `spotify-rip` into `~/.cursor/mcp.json` so the server is available in **every** Cursor project on that laptop, not just this repo.
+
+Env vars needed on the machine (add to `~/.zshrc` / `~/.bashrc` / system env):
+
+```bash
+export SPOTIFY_RIP_MCP_URL=https://HOST/mcp
+export SPOTIFY_RIP_MCP_TOKEN=<same token as the host>
+```
+
+To run it manually on a machine that has the repo but hasn't opened it yet:
+
+```bash
+python scripts/setup_mcp.py
+# or with explicit values:
+python scripts/setup_mcp.py --url https://HOST/mcp --token <TOKEN>
+```
+
+### 3. Every clone / IDE / CLI (git)
+
+Committed `.cursor/mcp.json` (same as `mcp.cloud.example.json`):
 
 ```json
 {
   "mcpServers": {
     "spotify-rip": {
-      "command": "mamba",
-      "args": ["run", "-n", "spotify-rip", "--no-capture-output",
-               "python", "-m", "mcp_server.server"],
-      "cwd": "/Users/jacksonmacleod/Documents/Spotify-Rip"
+      "url": "${env:SPOTIFY_RIP_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${env:SPOTIFY_RIP_MCP_TOKEN}"
+      }
     }
   }
 }
 ```
 
-The server speaks **MCP stdio protocol**.  
-It must be restarted from Cursor settings if `server.py` changes.
+On each machine, export `SPOTIFY_RIP_MCP_URL` (include `/mcp`) and `SPOTIFY_RIP_MCP_TOKEN`. Opening this repo is enough — project MCP wins over `~/.cursor/mcp.json`. Home-dir MCP is **not** synced by login.
+
+One-click install on a machine that is not in the repo:
+
+https://cursor.com/install-mcp?name=spotify-rip&config=eyJ1cmwiOiIke2VudjpTUE9USUZZX1JJUF9NQ1BfVVJMfSIsImhlYWRlcnMiOnsiQXV0aG9yaXphdGlvbiI6IkJlYXJlciAke2VudjpTUE9USUZZX1JJUF9NQ1BfVE9LRU59In19
+
+### 3. Cloud Agents + every linked Cursor account (dashboard)
+
+This repo cannot write the dashboard. Your Cloud Agent environment is **personal**, so each Cursor login has its own MCP dropdown until you put everyone on one Team.
+
+1. Invite every linked login to the same Cursor Team (SSO/invite). Profiles do not federate MCP.
+2. [Dashboard → Integrations & MCP](https://cursor.com/dashboard/integrations) → **Team MCP Servers** → add HTTP `https://HOST/mcp` with `Authorization: Bearer …` (Cursor redacts the header after save).
+3. **Add to Team Marketplace**. Then [Dashboard → Plugins](https://cursor.com/dashboard?tab=plugins): import this GitHub repo (`.cursor-plugin/marketplace.json` + `cursor-plugin/`). Set the **spotify-rip** plugin to **Required** (or Default On). Configure `MCP_URL` and `MCP_TOKEN` on the plugin.
+4. Personal Cloud Agents: [cursor.com/agents](https://cursor.com/agents) → MCP dropdown → enable **spotify-rip** (or the team server). Desktop `mcp.json` is not what Cloud Agent VMs read.
+5. Allowlist the same URL under Team Settings → MCP Configuration if the team uses an allowlist (allowlist does not install the server).
+
+| Surface | What attaches the MCP |
+|---|---|
+| Desktop / CLI, this repo | committed `.cursor/mcp.json` |
+| Desktop / CLI, any folder | Team Marketplace plugin **Required**, or the install link |
+| Cloud Agents | Team Integrations & MCP + Agents MCP dropdown |
+| Other Cursor logins | same Team + Required plugin; not the public Profile |
+
+HTTP binds `0.0.0.0:8000` by default. Stdio remains available as `python -m mcp_server.server` with no `--transport` for a single local machine.
 
 ---
 
@@ -124,10 +178,13 @@ _vault_hub      = open_vault_hub(…)  # writes Spotify-rip/live-state.md
 
 ```bash
 mamba activate spotify-rip
-spotify-rip-mcp          # via console_scripts entry point
+spotify-rip-mcp          # via console_scripts entry point (stdio)
 
 # or
 python -m mcp_server.server
+
+# Cloud / remote (Streamable HTTP on :8000/mcp)
+SPOTIFY_RIP_MCP_TOKEN=… python -m mcp_server.server --transport cloud
 ```
 
 ---

@@ -1,0 +1,11 @@
+{
+  "name": "phi-mcp",
+  "install": "cd /workspace && .venv/bin/pip install -e . --quiet 2>&1 | tail -3 || pip3 install -e . --quiet 2>&1 | tail -3",
+  "terminals": [
+    {
+      "name": "mcp-server",
+      "description": "Serves the spotify-rip MCP tools over Streamable HTTP on localhost:8090 so Cloud Agents can connect without needing stdio.",
+      "command": "cd /workspace && .venv/bin/python -m mcp_server.server --transport streamable-http --host 127.0.0.1 --port 8090 --allow-anon"
+    }
+  ]
+}

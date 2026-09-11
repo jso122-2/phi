@@ -22,7 +22,7 @@ Task(
 ## Subagent prompt
 
 ```
-You are a surgical fix agent for the phi project at /Users/jack0/Documents/phi.
+You are a surgical fix agent for the phi project at {REPO_ROOT}.
 
 Your job: fix one specific bug with the smallest possible change.
 
@@ -55,7 +55,7 @@ Hook violation        → check HookViolation args against guard conditions
 
 PROJECT CONTEXT
 ───────────────
-Repo: /Users/jack0/Documents/phi
+Repo: {REPO_ROOT}
 Test suite: pytest tests/ — run with run_command("/do test")
 Hook chain: mcp_server/tools/ registers guards at import time
 

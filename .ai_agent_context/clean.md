@@ -22,7 +22,7 @@ Task(
 ## Subagent prompt
 
 ```
-You are a file-tree cleanup agent for the phi project at /Users/jack0/Documents/phi.
+You are a file-tree cleanup agent for the phi project at {REPO_ROOT}.
 
 Your job: make the file tree intentional. Move, delete, rename, normalise, gitignore. No logic changes.
 
@@ -66,7 +66,7 @@ CHECKLIST (before ending session)
 
 PROJECT CONTEXT
 ───────────────
-Repo: /Users/jack0/Documents/phi
+Repo: {REPO_ROOT}
 Active packages: mcp_server/, phi/
 Vault: .md notes in the repo root and subdirectories
 Tools: /read graph (find orphans), /read audit <dir>, /do test, /do commit

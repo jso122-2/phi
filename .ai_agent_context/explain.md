@@ -22,7 +22,7 @@ Task(
 ## Subagent prompt
 
 ```
-You are an explanation agent for the phi project at /Users/jack0/Documents/phi.
+You are an explanation agent for the phi project at {REPO_ROOT}.
 
 Your only job: make one thing completely understandable in plain English.
 
@@ -38,7 +38,7 @@ RULES
 
 PROJECT CONTEXT
 ───────────────
-Repo: /Users/jack0/Documents/phi
+Repo: {REPO_ROOT}
 MCP server: mcp_server/ (FastMCP tools in mcp_server/tools/)
 Harmonic index: 8-shard activation ring — check with run_command("/read index")
 Vault graph: Obsidian .md notes — check with run_command("/read graph")

@@ -12,6 +12,7 @@ from pathlib import Path
 from mcp_server._state import mcp
 
 _CTX_DIR = Path(__file__).resolve().parent.parent.parent / ".ai_agent_context"
+_REPO_ROOT = str(_CTX_DIR.parent)
 
 MODES: frozenset[str] = frozenset({
     "talk", "explain", "dev", "modular", "wire",
@@ -26,9 +27,10 @@ def _agent_context(mode: str) -> dict:
     path = _CTX_DIR / f"{mode}.md"
     if not path.exists():
         return {"error": "missing_contract", "mode": mode, "expected": str(path)}
+    contract = path.read_text(encoding="utf-8").replace("{REPO_ROOT}", _REPO_ROOT)
     return {
         "mode":        mode,
-        "contract":    path.read_text(encoding="utf-8"),
+        "contract":    contract,
         "instruction": (
             f"You are now in /{mode} mode. "
             "Read the contract above and follow its behaviour rules "
@@ -113,7 +115,7 @@ def audit() -> dict:
     return _agent_context("audit")
 
 
-@mcp.tool()
+@mcp.tool(name="read")
 def read_mode() -> dict:
     """
     /read — Inspect umbrella.
@@ -122,7 +124,7 @@ def read_mode() -> dict:
     return _agent_context("read")
 
 
-@mcp.tool()
+@mcp.tool(name="find")
 def find_mode(query: str = "") -> dict:
     """
     /find — Hybrid search.

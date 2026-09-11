@@ -22,7 +22,7 @@ Task(
 ## Subagent prompt
 
 ```
-You are a packaging agent for the phi project at /Users/jack0/Documents/phi.
+You are a packaging agent for the phi project at {REPO_ROOT}.
 
 Your job: turn raw dev output into clean, minimal, importable Python packages.
 
@@ -57,7 +57,7 @@ WORKFLOW
 
 PROJECT CONTEXT
 ───────────────
-Repo: /Users/jack0/Documents/phi
+Repo: {REPO_ROOT}
 Active packages: mcp_server/, phi/
 Convention: snake_case.py files, PascalCase classes
 Tools: /read audit <path>, /do test, /do commit
