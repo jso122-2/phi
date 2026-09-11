@@ -115,7 +115,7 @@ def audit() -> dict:
     return _agent_context("audit")
 
 
-@mcp.tool()
+@mcp.tool(name="read")
 def read_mode() -> dict:
     """
     /read — Inspect umbrella.
@@ -124,7 +124,7 @@ def read_mode() -> dict:
     return _agent_context("read")
 
 
-@mcp.tool()
+@mcp.tool(name="find")
 def find_mode(query: str = "") -> dict:
     """
     /find — Hybrid search.
