@@ -33,6 +33,13 @@ htmlcov/
 !.cursor/hooks.json
 !.cursor/hooks/
 
+# Runtime bus state — ring buffers, PIDs, logs, and job records are ephemeral
+.runtime/bus/*.ring
+.runtime/bus/*.ring.lock
+.runtime/bus/*.pid
+.runtime/bus/*.log
+.runtime/bus/jobs/
+
 # Runtime mycelial / tracer logs (rewritten every tick)
 agent-log/*.txt
 
