@@ -20,6 +20,14 @@ def test_project_mcp_json_has_stdio_entry():
     assert "cwd" in entry
 
 
+def test_project_mcp_json_has_local_http_entry():
+    """Local HTTP entry connects Cloud Agents to the terminals-started server on localhost:8090."""
+    data = _load(ROOT / ".cursor" / "mcp.json")
+    entry = data["mcpServers"]["spotify-rip-local-http"]
+    assert entry["url"] == "http://localhost:8090/mcp"
+    assert "headers" not in entry  # no auth needed — allow-anon on localhost
+
+
 def test_project_mcp_json_has_cloud_entry():
     """Cloud entry is present as a secondary server for when a hosted server is running."""
     data = _load(ROOT / ".cursor" / "mcp.json")
@@ -27,6 +35,16 @@ def test_project_mcp_json_has_cloud_entry():
     assert "command" not in entry
     assert entry["url"] == "${env:SPOTIFY_RIP_MCP_URL}"
     assert "Bearer ${env:SPOTIFY_RIP_MCP_TOKEN}" in entry["headers"]["Authorization"]
+
+
+def test_environment_json_exists_and_has_mcp_terminal():
+    """environment.json must be committed and must start the MCP server as a terminal."""
+    env = _load(ROOT / ".cursor" / "environment.json")
+    assert "terminals" in env, "No terminals defined"
+    commands = [t["command"] for t in env["terminals"]]
+    assert any("mcp_server.server" in c and "streamable-http" in c for c in commands), (
+        "No terminal starts the MCP HTTP server. Cloud Agents need this to reach the tools."
+    )
 
 
 def test_plugin_mcp_uses_dashboard_variables():

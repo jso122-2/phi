@@ -27,8 +27,9 @@ htmlcov/
 # Embedding / MiniLM cache (rebuilt locally)
 .cache/
 
-# Nested Cursor dir — share MCP config + hooks, keep local rules out of git
+# Nested Cursor dir — share MCP config + hooks + env; keep local rules out of git
 .cursor/*
+!.cursor/environment.json
 !.cursor/mcp.json
 !.cursor/hooks.json
 !.cursor/hooks/

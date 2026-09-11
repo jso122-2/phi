@@ -5,6 +5,9 @@
       "args": ["-m", "mcp_server.server"],
       "cwd": "${workspaceFolder}"
     },
+    "spotify-rip-local-http": {
+      "url": "http://localhost:8090/mcp"
+    },
     "spotify-rip-cloud": {
       "url": "${env:SPOTIFY_RIP_MCP_URL}",
       "headers": {
