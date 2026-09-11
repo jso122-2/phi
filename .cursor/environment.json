@@ -1,0 +1,5 @@
+{
+  "name": "phi",
+  "user": "ubuntu",
+  "install": "sudo apt-get update -qq && sudo apt-get install -y python3-venv python3-pip -q && cd /workspace && python3 -m venv .venv --system-site-packages && .venv/bin/pip install --upgrade pip setuptools wheel -q && .venv/bin/pip install -e '.[dev]' -q"
+}
