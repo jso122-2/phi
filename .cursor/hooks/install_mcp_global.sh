@@ -43,13 +43,16 @@ repo_root = Path(sys.argv[1])
 project_mcp = repo_root / ".cursor" / "mcp.json"
 global_mcp  = Path.home() / ".cursor" / "mcp.json"
 
-# The entry we want present globally — uses ${env:...} so Cursor expands
-# the real URL/token from the machine's environment at runtime.
+# The entry we want present globally — uses the venv Python from this repo
+# so the server works on any machine without env-var credentials.
+import shutil
+
+venv_py = repo_root / ".venv" / "bin" / "python"
+python_cmd = str(venv_py) if venv_py.exists() else (shutil.which("python3") or "python3")
 ENTRY = {
-    "url": "${env:SPOTIFY_RIP_MCP_URL}",
-    "headers": {
-        "Authorization": "Bearer ${env:SPOTIFY_RIP_MCP_TOKEN}"
-    }
+    "command": python_cmd,
+    "args": ["-m", "mcp_server.server"],
+    "cwd": str(repo_root),
 }
 
 def load(path: Path) -> dict:

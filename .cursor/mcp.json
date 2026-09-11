@@ -1,6 +1,11 @@
 {
   "mcpServers": {
     "spotify-rip": {
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["-m", "mcp_server.server"],
+      "cwd": "${workspaceFolder}"
+    },
+    "spotify-rip-cloud": {
       "url": "${env:SPOTIFY_RIP_MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${env:SPOTIFY_RIP_MCP_TOKEN}"

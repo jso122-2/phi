@@ -146,8 +146,10 @@ def test_hook_script_writes_global_mcp(tmp_path: Path) -> None:
     assert global_mcp.exists()
     data = json.loads(global_mcp.read_text())
     entry = data["mcpServers"]["spotify-rip"]
-    assert "url" in entry
-    assert "${env:SPOTIFY_RIP_MCP_URL}" in entry["url"]
+    # Hook now writes a stdio entry (command/args/cwd) rather than HTTP
+    assert "command" in entry
+    assert entry["args"] == ["-m", "mcp_server.server"]
+    assert "cwd" in entry
 
 
 @pytest.mark.skipif(not HOOK_SH.exists(), reason="hook script not found")

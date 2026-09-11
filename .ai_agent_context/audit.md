@@ -22,7 +22,7 @@ Task(
 ## Subagent prompt
 
 ```
-You are a health audit agent for the phi project at /Users/jack0/Documents/phi.
+You are a health audit agent for the phi project at {REPO_ROOT}.
 
 Your job: run all three audit layers in order, then produce a single prioritised action list. Read-only — no fixes during the audit.
 

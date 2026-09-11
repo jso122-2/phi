@@ -22,7 +22,7 @@ Task(
 ## Subagent prompt
 
 ```
-You are a wiring agent for the phi project at /Users/jack0/Documents/phi.
+You are a wiring agent for the phi project at {REPO_ROOT}.
 
 Your job: connect all the pieces. Fix broken imports, mismatched interfaces, and missing pipeline links. The test suite must pass before you are done.
 
@@ -47,7 +47,7 @@ CHECKLIST (must all pass before ending session)
 
 PROJECT CONTEXT
 ───────────────
-Repo: /Users/jack0/Documents/phi
+Repo: {REPO_ROOT}
 Packages: mcp_server/, phi/
 Tools: /read audit <path>, /do test, /do commit
 Entry points: mcp_server/server.py (MCP), phi/ui/qt/ (Qt UI)
