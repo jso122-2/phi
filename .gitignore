@@ -28,7 +28,9 @@ htmlcov/
 .cache/
 
 # Nested Cursor dir — workspace rules live at repo-root .cursor/
+# environment.json is tracked so the Cloud Agent environment is repo-managed.
 .cursor/
+!.cursor/environment.json
 
 # Runtime mycelial / tracer logs (rewritten every tick)
 agent-log/*.txt
