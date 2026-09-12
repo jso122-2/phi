@@ -24,6 +24,13 @@ from mcp_server._guard import install_tool_guard
 
 from mcp.server.fastmcp import FastMCP
 
+# ---------------------------------------------------------------------------
+# HTTP transport settings (used when running in SSE / streamable-http mode)
+# Override with MCP_HOST and MCP_PORT environment variables.
+# ---------------------------------------------------------------------------
+_MCP_HOST: str = os.environ.get("MCP_HOST", "127.0.0.1")
+_MCP_PORT: int = int(os.environ.get("MCP_PORT", "8000"))
+
 # Runtime snapshot — vault root, survives server restarts (gitignored).
 # Override with SPOTIFY_RIP_HARMONIC_SNAPSHOT for tests.
 _VAULT_ROOT: Path = Path(__file__).parent.parent
@@ -53,6 +60,8 @@ mcp = FastMCP(
         "Enforces environment initialisation, runs attractor simulations, "
         "and manages the harmonically-sharded propagation index."
     ),
+    host=_MCP_HOST,
+    port=_MCP_PORT,
 )
 install_tool_guard(mcp)
 

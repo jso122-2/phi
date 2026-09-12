@@ -1,0 +1,4 @@
+{
+  "install": "pip install --break-system-packages \"mcp>=1.0,<2.0\" uvicorn starlette anyio httpx-sse pydantic-settings\npip install --break-system-packages numpy scipy matplotlib fastembed\npip install --break-system-packages -e /workspace",
+  "start": "cd /workspace && MCP_HOST=0.0.0.0 MCP_PORT=8000 MCP_TRANSPORT=sse python -m mcp_server --transport sse"
+}

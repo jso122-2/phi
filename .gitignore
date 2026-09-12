@@ -29,6 +29,7 @@ htmlcov/
 
 # Nested Cursor dir — workspace rules live at repo-root .cursor/
 .cursor/
+!.cursor/environment.json
 
 # Runtime mycelial / tracer logs (rewritten every tick)
 agent-log/*.txt
