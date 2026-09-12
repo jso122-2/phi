@@ -42,6 +42,7 @@ _TOOL_MODULES = [
     "phi_dispatch",
     "modular",
     "notion_sync",
+    "skills_sync",
 ]
 
 load_errors: dict[str, str] = {}

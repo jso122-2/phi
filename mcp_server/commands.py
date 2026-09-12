@@ -158,6 +158,7 @@ _MOD = "mcp_server.tools.modular"
 _RATE = "mcp_server.tools.rate"
 _NTN = "mcp_server.tools.notion_reservoir"
 _CTX = "mcp_server.tools.context_modes"
+_SKILLS = "mcp_server.tools.skills_sync"
 
 
 SPECS: tuple[CommandSpec, ...] = (
@@ -350,6 +351,17 @@ SPECS: tuple[CommandSpec, ...] = (
     _mcp("read",    "agent_context", _CTX,
          "Inspect — bare loads vault context; /read <sub> dispatches.",
          defaults={"mode": "read"},    init_free=True),
+
+    # -- skills/rules sync -------------------------------------------------
+    _mcp("skills-list", "skills_list", _SKILLS,
+         "List all canonical skills and rules from the repo.",
+         init_free=True),
+    _mcp("skills-pull", "skills_pull", _SKILLS,
+         "Write canonical skills/rules to a target ~/.cursor directory.",
+         optional=("target_dir",), init_free=True),
+    _mcp("skills-push", "skills_push", _SKILLS,
+         "Push locally edited skills/rules back into the canonical repo.",
+         positionals=("source_dir",), init_free=True),
 )
 
 CATALOG: Final[dict[str, CommandSpec]] = {s.slash: s for s in SPECS}
@@ -441,6 +453,9 @@ DO_SUBS: Final[dict[str, str]] = {
     "10": "10",
     "vault-project": "vault-project",
     "vault-migrate": "vault-migrate",
+    "skills-list": "skills-list",
+    "skills-pull": "skills-pull",
+    "skills-push": "skills-push",
 }
 
 _HELP_TOKS: Final[frozenset[str]] = frozenset({"help", "--help", "--list", "subs", "subcommands"})
