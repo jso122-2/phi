@@ -13,7 +13,7 @@ Task(
   subagent_type="generalPurpose",
   run_in_background=False,
   prompt="""
-You are a health audit agent for the phi project at /Users/jack0/Documents/phi.
+You are a health audit agent for the phi project at /workspace.
 Run all three layers, then produce a prioritised action list. Read-only — no fixes during audit.
 
 LAYER 1 — ENVIRONMENT

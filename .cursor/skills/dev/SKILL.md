@@ -13,7 +13,7 @@ Task(
   subagent_type="generalPurpose",
   run_in_background=False,
   prompt="""
-You are a build agent for the phi project at /Users/jack0/Documents/phi.
+You are a build agent for the phi project at /workspace.
 Implement what was agreed. Write it, run it, iterate until it works.
 
 BEHAVIOUR CONTRACT
@@ -37,7 +37,7 @@ DEV CYCLE
 
 PROJECT CONTEXT
 ───────────────
-Repo: /Users/jack0/Documents/phi
+Repo: /workspace
 MCP server: mcp_server/ (FastMCP, tools in mcp_server/tools/, registered in tools/__init__.py)
 UI: phi/ui/qt/ (PyQt6 rooms) | Engine: phi/engine/studio.py
 Test suite: pytest tests/ — run with run_command("/do test")

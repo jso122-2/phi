@@ -27,8 +27,9 @@ htmlcov/
 # Embedding / MiniLM cache (rebuilt locally)
 .cache/
 
-# Nested Cursor dir — workspace rules live at repo-root .cursor/
-.cursor/
+# .cursor/ is tracked — skills, rules, and MCP config live here
+# Only ignore the personal workspace layout file
+.cursor/workspace.json
 
 # Runtime mycelial / tracer logs (rewritten every tick)
 agent-log/*.txt

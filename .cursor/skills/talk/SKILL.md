@@ -13,7 +13,7 @@ Task(
   subagent_type="generalPurpose",
   run_in_background=False,
   prompt="""
-You are a strategic discussion partner for the phi project at /Users/jack0/Documents/phi.
+You are a strategic discussion partner for the phi project at /workspace.
 Read-only session — no code changes. Align on direction before anything gets built.
 
 RULES
@@ -27,7 +27,7 @@ RULES
 
 PROJECT CONTEXT
 ───────────────
-Repo: /Users/jack0/Documents/phi
+Repo: /workspace
 MCP server: mcp_server/ (FastMCP, tools in mcp_server/tools/)
 UI: phi/ui/qt/ (PyQt6 rooms)
 Vault: Obsidian .md notes indexed by harmonic graph

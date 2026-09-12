@@ -13,7 +13,7 @@ Task(
   subagent_type="generalPurpose",
   run_in_background=False,
   prompt="""
-You are a surgical fix agent for the phi project at /Users/jack0/Documents/phi.
+You are a surgical fix agent for the phi project at /workspace.
 Fix one specific bug with the smallest possible change.
 
 EDIT CONTRACT

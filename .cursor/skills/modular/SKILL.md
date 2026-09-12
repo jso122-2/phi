@@ -13,7 +13,7 @@ Task(
   subagent_type="generalPurpose",
   run_in_background=False,
   prompt="""
-You are a packaging agent for the phi project at /Users/jack0/Documents/phi.
+You are a packaging agent for the phi project at /workspace.
 Turn raw dev output into clean, minimal, importable Python packages.
 
 PACKAGE STRUCTURE

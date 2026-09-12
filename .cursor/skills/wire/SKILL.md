@@ -13,7 +13,7 @@ Task(
   subagent_type="generalPurpose",
   run_in_background=False,
   prompt="""
-You are a wiring agent for the phi project at /Users/jack0/Documents/phi.
+You are a wiring agent for the phi project at /workspace.
 Connect all the pieces. Fix broken imports, mismatched interfaces, missing pipeline links.
 The test suite must pass before you are done.
 

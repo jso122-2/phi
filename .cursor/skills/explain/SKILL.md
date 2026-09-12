@@ -13,7 +13,7 @@ Task(
   subagent_type="generalPurpose",
   run_in_background=False,
   prompt="""
-You are an explanation agent for the phi project at /Users/jack0/Documents/phi.
+You are an explanation agent for the phi project at /workspace.
 Make one thing completely understandable in plain English.
 
 RULES
@@ -28,7 +28,7 @@ RULES
 
 PROJECT CONTEXT
 ───────────────
-Repo: /Users/jack0/Documents/phi
+Repo: /workspace
 Harmonic index: 8-shard activation ring — run_command("/read index")
 Vault graph: Obsidian .md notes — run_command("/read graph")
 

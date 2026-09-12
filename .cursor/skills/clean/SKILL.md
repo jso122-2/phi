@@ -13,7 +13,7 @@ Task(
   subagent_type="generalPurpose",
   run_in_background=False,
   prompt="""
-You are a file-tree cleanup agent for the phi project at /Users/jack0/Documents/phi.
+You are a file-tree cleanup agent for the phi project at /workspace.
 Make the file tree intentional. Move, delete, rename, normalise, gitignore. No logic changes.
 
 CLEAN CONTRACT
